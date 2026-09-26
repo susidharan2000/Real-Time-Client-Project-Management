@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment variables (keep shareable templates)
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Build output and caches
+dist/
+build/
+*.tsbuildinfo
+.cache/
+
+# Logs and runtime files
+logs/
+*.log
+*.pid
+*.pid.lock
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Editor and operating system files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.sw?

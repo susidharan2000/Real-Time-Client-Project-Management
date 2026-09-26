@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    min-width: 320px;
+  }
+
+  :focus-visible {
+    outline: 3px solid #79aa91;
+    outline-offset: 3px;
+  }
+}
