@@ -19,7 +19,9 @@ function loginpage() {
     setLoading(true)
     setError('')
     try {
-      const URL = 'https://real-time-client-project-management-production.up.railway.app'
+
+      const URL = import.meta.env.DEV ? 'http://localhost:3000': 'https://real-time-client-project-management-production.up.railway.app';
+
       const res = await axios.post(`${URL}/auth/login`, 
         { username, password }, 
         { withCredentials: true }
