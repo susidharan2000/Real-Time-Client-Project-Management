@@ -6,12 +6,11 @@ import { authRouter } from "./auth/auth.route.ts";
 
 export const app = express();
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_ORIGIN ?? "https://real-time-client-project-management-production.up.railway.app",
-    credentials: true,
-  })
-);
+
+app.use(cors({
+  origin: process.env.FRONTEND_ORIGIN,
+  credentials: true,
+}));
 
 app.use(express.json());
 app.use(cookieParser());
