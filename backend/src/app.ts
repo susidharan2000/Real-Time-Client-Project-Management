@@ -8,7 +8,7 @@ export const app = express();
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
+    origin: process.env.FRONTEND_ORIGIN ?? "https://real-time-client-project-management-production.up.railway.app",
     credentials: true,
   })
 );
