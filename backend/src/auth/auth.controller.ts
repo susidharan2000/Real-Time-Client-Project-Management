@@ -1,5 +1,5 @@
 import type { Request, Response} from "express";
-import { authenticateUser,verifyRefreshToken,RevokeRefreshToken } from "./auth.service.ts";
+import { authenticateUser,verifyRefreshToken,RevokeRefreshToken,verifySession } from "./auth.service.ts";
 
 // Validate the request body for username and password
 //             Create the refresh token and access token
@@ -62,6 +62,28 @@ export const logout = async (req: Request, res: Response) => {
         }
         res.clearCookie("refreshToken");
         return res.status(200).json({message: "Logged out successfully"});
+    }
+    catch(err){
+        return res.status(500).json({message: "Internal server error"});
+    }
+}
+
+export const checkSession = async (req: Request, res: Response) => {
+    try{
+        const refreshToken = req.cookies.refreshToken;
+        if (!refreshToken) {
+            return res.status(401).json({message: "Refresh token not found"});
+        }
+        const result = await verifySession(refreshToken);
+        if (result === null) {
+            return res.status(401).json({message: "Invalid refresh token"});
+        }
+        return res.status(200).json({
+            "userName": result.user.username,
+            "userId": result.user.userId,
+            "role": result.user.role,
+            "accessToken": result.accessToken,
+        });
     }
     catch(err){
         return res.status(500).json({message: "Internal server error"});

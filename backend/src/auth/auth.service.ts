@@ -89,3 +89,46 @@ export async function RevokeRefreshToken(refreshToken: string): Promise<boolean>
         throw err;
     }
 }
+
+type sessionResult = {
+  accessToken: string;
+  user: {
+    userId: string;
+    username: string;
+    role: "ADMIN" | "PROJECT_MANAGER" | "DEVELOPER";
+  };
+};
+
+export async function verifySession(refreshToken: string): Promise<sessionResult | null> {
+    try {
+        const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+        const tokenRecord = await pool.query(`SELECT rt.user_id, u.user_name, r.role_name
+                                                FROM refresh_tokens rt
+                                                JOIN users u ON u.user_id = rt.user_id
+                                                JOIN roles r ON r.role_id = u.role_id
+                                                WHERE rt.token_hash = $1
+                                                AND rt.revoked_at IS NULL
+                                                AND rt.expires_at > now()
+                                                AND u.is_active = true
+                                                LIMIT 1`,
+                                                [refreshTokenHash]
+                                            );
+        if (tokenRecord.rowCount === 0) {
+            return null;
+        }
+        const accessToken = jwt.sign({ user_id: tokenRecord.rows[0].user_id }, process.env.ACCESS_TOKEN_SECRET!, { expiresIn: '15m' });
+        const res: sessionResult = {
+            accessToken,
+            user: {
+                userId: tokenRecord.rows[0].user_id,
+                username: tokenRecord.rows[0].user_name,
+                role: tokenRecord.rows[0].role_name
+            }
+        }; 
+        return res;
+    } 
+    catch (err) {
+        console.error("Error occurred while verifying session:", err);
+        throw err;
+    }       
+}

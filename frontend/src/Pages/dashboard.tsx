@@ -1,17 +1,33 @@
-import AdminDashboard from "../Pages/AdminDashboard";
-import  ProjectManagerDashboard from "../Pages/ProjectManagerDashboard";
-import DeveloperDashboard from "../Pages/DeveloperDashboard";
+import AdminDashboard from "./AdminDashboard";
+import ProjectManagerDashboard from "./ProjectManagerDashboard";
+import DeveloperDashboard from "./DeveloperDashboard";
+import Header from "./Header";
 
-type DashboardProps ={
+type DashboardProps = {
   userName: string;
   userId: string;
   role: string;
+  handleLogout: ()=> Promise<void>;
+  notificationCount?: number;
 };
 
-function dashboard({ userName, userId, role }: DashboardProps) {
-    return(
-        (role === "ADMIN") ? < AdminDashboard username={userName} userId={userId} /> : role === "PROJECT_MANAGER" ? < ProjectManagerDashboard username={userName} userId={userId}/> : role === "DEVELOPER" ? < DeveloperDashboard username={userName} userId={userId}/> : <p>Invalid role</p>
-    )
+function Dashboard({ userName, userId, role, handleLogout, notificationCount = 0 }: DashboardProps) {
+  return (
+    <>
+      <Header userName={userName} role={role} handleLogout={handleLogout} notificationCount={notificationCount} />
+      <main>
+        {role === "ADMIN" ? (
+          <AdminDashboard username={userName} userId={userId} />
+        ) : role === "PROJECT_MANAGER" ? (
+          <ProjectManagerDashboard username={userName} userId={userId} />
+        ) : role === "DEVELOPER" ? (
+          <DeveloperDashboard username={userName} userId={userId} />
+        ) : (
+          <p>Invalid role</p>
+        )}
+      </main>
+    </>
+  );
 }
 
-export default dashboard
+export default Dashboard;
