@@ -71,7 +71,7 @@ function LoginPage({ initialSession }: LoginPageProps) {
  }
 
     if (signedIn) {
-      return <Dashboard userName={username} userId={userId} role={role} handleLogout={handleLogout}/>
+      return <Dashboard userName={username} userId={userId} role={role} accessToken={accessToken ?? ''} handleLogout={handleLogout}/>
     }
 
     return(

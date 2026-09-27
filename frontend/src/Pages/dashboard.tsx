@@ -7,17 +7,18 @@ type DashboardProps = {
   userName: string;
   userId: string;
   role: string;
+  accessToken: string;
   handleLogout: ()=> Promise<void>;
   notificationCount?: number;
 };
 
-function Dashboard({ userName, userId, role, handleLogout, notificationCount = 0 }: DashboardProps) {
+function Dashboard({ userName, userId, role, accessToken, handleLogout, notificationCount = 0 }: DashboardProps) {
   return (
     <>
       <Header userName={userName} role={role} handleLogout={handleLogout} notificationCount={notificationCount} />
       <main>
         {role === "ADMIN" ? (
-          <AdminDashboard username={userName} userId={userId} />
+          <AdminDashboard username={userName} userId={userId} accessToken={accessToken} />
         ) : role === "PROJECT_MANAGER" ? (
           <ProjectManagerDashboard username={userName} userId={userId} />
         ) : role === "DEVELOPER" ? (

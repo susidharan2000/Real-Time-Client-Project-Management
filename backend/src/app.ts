@@ -3,8 +3,12 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 
 import { authRouter } from "./auth/auth.route.ts";
+import { dashboardRouter } from "./dashboard/dashboard.router.ts"
+import {taskRouter} from "./task/task.router.ts"
+import {projectRouter} from "./project/project.router.ts"
+import {clientRouter} from "./client/client.router.ts"
 
-export const app = express();
+export const app= express();
 
 console.log("FRONTEND_ORIGIN:",process.env.FRONTEND_ORIGIN);
 app.use(cors({
@@ -20,3 +24,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/dashboard", dashboardRouter);
+app.use("/task", taskRouter);
+app.use("/project", projectRouter);
+app.use("/client", clientRouter);
