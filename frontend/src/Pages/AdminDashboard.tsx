@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useEffect, useState, type ReactNode } from "react";
-import ClientManager, { type Client } from "../components/ClientManager";
+import ClientManager from "../components/ClientManager";
 
 type TaskStatus = "TO_DO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -78,10 +78,16 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const [clientsOpen, setClientsOpen] = useState(false);
-  const [previewClients, setPreviewClients] = useState<Client[]>([]);
+  const [clientsOpen, setClientsOpen] = useState(() => window.location.hash === "#clients");
 
   useEffect(() => {
+    const updatePage = () => setClientsOpen(window.location.hash === "#clients");
+    window.addEventListener("hashchange", updatePage);
+    return () => window.removeEventListener("hashchange", updatePage);
+  }, []);
+
+  useEffect(() => {
+    if (clientsOpen) return;
     const controller = new AbortController();
 
     async function loadSummary() {
@@ -121,7 +127,7 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
 
     void loadSummary();
     return () => controller.abort();
-  }, [accessToken, retryCount]);
+  }, [accessToken, retryCount, clientsOpen]);
 
   function retrySummary() {
     setLoading(true);
@@ -131,6 +137,10 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
 
   const completedPercent = totalTasks > 0 ? Math.round((tasksByStatus.DONE / totalTasks) * 100) : 0;
   const formatCount = (count: number) => loading ? "…" : error ? "—" : count.toLocaleString();
+
+  if (clientsOpen) {
+    return <ClientManager accessToken={accessToken}/>;
+  }
 
   return (
     <section className="min-h-[calc(100vh-5rem)] bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-10" aria-labelledby="admin-dashboard-title" aria-busy={loading}>
@@ -161,7 +171,7 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
             </div>
             <p className="mt-5 break-words text-4xl font-semibold tracking-tight tabular-nums">{formatCount(totalClients)}</p>
             <p className="mt-2 text-xs text-slate-500">Clients in your workspace</p>
-            <button type="button" onClick={() => setClientsOpen(true)} aria-haspopup="dialog" className={`mt-6 flex w-full items-center justify-between rounded-sm border-t border-slate-100 pt-4 text-xs font-semibold text-violet-700 hover:text-violet-900 ${focusStyle}`}>View clients <Icon name="arrow" small /></button>
+            <a href="#clients" className={`mt-6 flex w-full items-center justify-between rounded-sm border-t border-slate-100 pt-4 text-xs font-semibold text-violet-700 hover:text-violet-900 ${focusStyle}`}>View clients <Icon name="arrow" small /></a>
           </SummaryCard>
 
           <SummaryCard href="/projects" className="border-emerald-900 bg-emerald-950 text-white hover:bg-emerald-900">
@@ -247,9 +257,6 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
         </section>
 
       </div>
-      {clientsOpen && (
-        <ClientManager clients={previewClients} onClientsChange={setPreviewClients} onClose={() => setClientsOpen(false)} />
-      )}
     </section>
   );
 }
