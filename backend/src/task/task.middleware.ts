@@ -43,6 +43,7 @@ export function requireTaskAuth(...allowedRoles: string[]) {
         if (!authorized){
              return res.status(403).json({ message: "Admin access required" });
         }
+        res.locals.userId = userId;
       } catch {
         return res.status(401).json({ message: "Invalid or expired access token" });
       }

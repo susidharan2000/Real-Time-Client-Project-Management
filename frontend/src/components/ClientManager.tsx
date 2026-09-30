@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import axios from "axios";
 import { useEffect, useState } from "react";
 
@@ -164,7 +165,7 @@ function clearFeild(){
     <section className="min-h-[calc(100dvh-5rem)] bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 sm:py-8" aria-labelledby="clients-title">
       <div className="mx-auto max-w-7xl space-y-6">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
-          <a href="#dashboard" className="rounded text-slate-500 hover:text-emerald-800">Dashboard</a>
+          <Link to="/" className="rounded text-slate-500 hover:text-emerald-800">Dashboard</Link>
           <span aria-hidden="true" className="text-slate-300">/</span>
           <span aria-current="page" className="font-medium text-slate-800">Clients</span>
         </nav>

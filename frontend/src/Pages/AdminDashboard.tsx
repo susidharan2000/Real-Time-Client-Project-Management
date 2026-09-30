@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useEffect, useState, type ReactNode } from "react";
-import ClientManager from "../components/ClientManager";
+import { Link } from "react-router";
 
 type TaskStatus = "TO_DO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
 
@@ -22,6 +22,7 @@ type AdminDashboardProps = {
   username: string;
   userId: string;
   accessToken: string;
+  role:string;
 };
 
 const URL = 'http://localhost:3000';
@@ -60,10 +61,10 @@ const focusStyle = "focus-visible:outline-2 focus-visible:outline-offset-4 focus
 
 function SummaryCard({ href, className, children }: { href?: string; className: string; children: ReactNode }) {
   const styles = `flex min-w-0 flex-col rounded-2xl border p-5 shadow-sm transition-colors sm:p-6 ${className}`;
-  return href ? <a href={href} className={`${styles} ${focusStyle}`}>{children}</a> : <div className={styles}>{children}</div>;
+  return href ? <Link to={href} className={`${styles} ${focusStyle}`}>{children}</Link> : <div className={styles}>{children}</div>;
 }
 
-function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
+function AdminDashboard({ username, accessToken, role }: AdminDashboardProps) {
   const [totalClients, setTotalClients] = useState(0);
   const [totalProjects, setTotalProjects] = useState(0);
   const [totalTasks, setTotalTasks] = useState(0);
@@ -78,16 +79,7 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-  const [clientsOpen, setClientsOpen] = useState(() => window.location.hash === "#clients");
-
   useEffect(() => {
-    const updatePage = () => setClientsOpen(window.location.hash === "#clients");
-    window.addEventListener("hashchange", updatePage);
-    return () => window.removeEventListener("hashchange", updatePage);
-  }, []);
-
-  useEffect(() => {
-    if (clientsOpen) return;
     const controller = new AbortController();
 
     async function loadSummary() {
@@ -127,7 +119,7 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
 
     void loadSummary();
     return () => controller.abort();
-  }, [accessToken, retryCount, clientsOpen]);
+  }, [accessToken, retryCount]);
 
   function retrySummary() {
     setLoading(true);
@@ -137,10 +129,6 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
 
   const completedPercent = totalTasks > 0 ? Math.round((tasksByStatus.DONE / totalTasks) * 100) : 0;
   const formatCount = (count: number) => loading ? "…" : error ? "—" : count.toLocaleString();
-
-  if (clientsOpen) {
-    return <ClientManager accessToken={accessToken}/>;
-  }
 
   return (
     <section className="min-h-[calc(100vh-5rem)] bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-10" aria-labelledby="admin-dashboard-title" aria-busy={loading}>
@@ -171,7 +159,7 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
             </div>
             <p className="mt-5 break-words text-4xl font-semibold tracking-tight tabular-nums">{formatCount(totalClients)}</p>
             <p className="mt-2 text-xs text-slate-500">Clients in your workspace</p>
-            <a href="#clients" className={`mt-6 flex w-full items-center justify-between rounded-sm border-t border-slate-100 pt-4 text-xs font-semibold text-violet-700 hover:text-violet-900 ${focusStyle}`}>View clients <Icon name="arrow" small /></a>
+            <Link to="/clients" className={`mt-6 flex w-full items-center justify-between rounded-sm border-t border-slate-100 pt-4 text-xs font-semibold text-violet-700 hover:text-violet-900 ${focusStyle}`}>View clients <Icon name="arrow" small /></Link>
           </SummaryCard>
 
           <SummaryCard href="/projects" className="border-emerald-900 bg-emerald-950 text-white hover:bg-emerald-900">
@@ -224,12 +212,12 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
               <h2 id="task-status-title" className="text-lg font-semibold tracking-tight">Tasks by status</h2>
               <p className="mt-1 text-sm text-slate-500">From the first step to the finish line.</p>
             </div>
-            <a href="/tasks" className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 ${focusStyle}`}>View all tasks <Icon name="arrow" small /></a>
+            <Link to="/tasks" className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 ${focusStyle}`}>View all tasks <Icon name="arrow" small /></Link>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {statuses.map((status) => (
-              <a key={status.key} href={`/tasks?status=${status.key}`} className={`rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-400 hover:bg-slate-50 ${focusStyle}`}>
+              <Link key={status.key} to={`/tasks?status=${status.key}`} className={`rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-400 hover:bg-slate-50 ${focusStyle}`}>
                 <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${status.badge}`}>
                   <span className={`size-1.5 rounded-full ${status.color}`} aria-hidden="true" />
                   {status.label}
@@ -239,7 +227,7 @@ function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
                   <span className="text-slate-400"><Icon name="arrow" small /></span>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">{status.description}</p>
-              </a>
+              </Link>
             ))}
           </div>
 

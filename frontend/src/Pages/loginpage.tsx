@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useState, type FormEvent} from 'react'
 import Dashboard from './dashboard'
+import { useNavigate } from 'react-router'
 
 type LoginPageProps = {
   initialSession?: {
@@ -15,6 +16,7 @@ const URL = 'http://localhost:3000';
 //const URL = 'https://real-time-client-project-management-production.up.railway.app';
 
 function LoginPage({ initialSession }: LoginPageProps) {
+    const navigate = useNavigate();
     const [accessToken, setAccessToken] = useState<string | null>(initialSession?.accessToken ?? null)
       const [username, setUsername] = useState(initialSession?.username ?? '')
       const [userId, setUserId] = useState(initialSession?.userId ?? '')
@@ -40,6 +42,7 @@ function LoginPage({ initialSession }: LoginPageProps) {
       setUsername(res.data.userName)
       setUserId(res.data.userId)
       setPassword('')
+      navigate('/', { replace: true });
     } catch (err) {
       if (axios.isAxiosError<{ message: string }>(err)) {
         setError(err.response?.data?.message ?? 'Could not reach the server');
@@ -64,6 +67,7 @@ function LoginPage({ initialSession }: LoginPageProps) {
       setUsername("");
       setUserId("");
       setAccessToken("");
+      navigate('/', { replace: true });
     }
   } catch (err) {
     console.error("Logout failed:", err);
