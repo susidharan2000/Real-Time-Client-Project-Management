@@ -1,6 +1,6 @@
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import axios from "axios";
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Status = 'TO_DO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -51,6 +51,12 @@ function errorMessage(err: unknown) {
 }
 
 export default function Task({accessToken,role}: TaskProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedTaskName = searchParams.get("task_name") ?? "";
+  const appliedProjectId = searchParams.get("project_id") || "all";
+  const requestedStatus = searchParams.get("status") ?? "all";
+  const appliedStatus = ["TO_DO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(requestedStatus) ? requestedStatus : "all";
+  const appliedPriority = searchParams.get("priority") || "all";
   const [showAddTaskUI, setshowAddTaskUI] = useState(false);
   const [tasks, setTasks] = useState<TaskRowList[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -75,10 +81,10 @@ export default function Task({accessToken,role}: TaskProps) {
   const detailsRef = useRef<HTMLDialogElement>(null);
 
 
-  const [taskNameFilter,SetTaskNameFilter] = useState("")
-  const [projectIDFiter,SetProjectIDFilter] = useState("all")
-  const [statusFilter,SetStatusFilter] = useState("all")
-  const [priorityFilter,SetPriorityFilter] = useState("all")
+  const [taskNameFilter,SetTaskNameFilter] = useState(appliedTaskName)
+  const [projectIDFiter,SetProjectIDFilter] = useState(appliedProjectId)
+  const [statusFilter,SetStatusFilter] = useState(appliedStatus)
+  const [priorityFilter,SetPriorityFilter] = useState(appliedPriority)
   const [projectListFilter,SetProjectListfilter] = useState<{project_id: string; project_title: string}[]>([])
 
    const URL = "http://localhost:3000";
@@ -112,23 +118,14 @@ export default function Task({accessToken,role}: TaskProps) {
 
 
   //handle the Filter
-  async function handleFilter(){
-     try {
-    const res = await axios.get(`${URL}/task/search`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      params: {
-        task_name: taskNameFilter.trim() || undefined,
-        project_id: projectIDFiter === "all" ? undefined : projectIDFiter,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        priority: priorityFilter === "all" ? undefined : priorityFilter,
-      },
-    });
-    setTasks(res.data.tasks);
-  }catch(error){
-    console.error("Failed to search tasks:", error);
-  }
+  function handleFilter(){
+    const params = new URLSearchParams();
+    if (taskNameFilter.trim()) params.set("task_name", taskNameFilter.trim());
+    if (projectIDFiter !== "all") params.set("project_id", projectIDFiter);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (priorityFilter !== "all") params.set("priority", priorityFilter);
+    setSearchParams(params);
+    setTaskListRefresh((current) => !current);
   }
 
   //handle Clear Filter
@@ -137,30 +134,53 @@ export default function Task({accessToken,role}: TaskProps) {
     SetProjectIDFilter("all")
     SetStatusFilter("all")
     SetPriorityFilter("all")
+    setSearchParams({});
     setTaskListRefresh((current) => !current)
   }
 
+  // Reset the draft fields when navigation changes the applied filters.
+  const filterKey = JSON.stringify([appliedTaskName, appliedProjectId, appliedStatus, appliedPriority]);
+  const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
+  if (previousFilterKey !== filterKey) {
+    setPreviousFilterKey(filterKey);
+    SetTaskNameFilter(appliedTaskName);
+    SetProjectIDFilter(appliedProjectId);
+    SetStatusFilter(appliedStatus);
+    SetPriorityFilter(appliedPriority);
+  }
 
   // Fetch the list again after a successful change.
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchTasks() {
       setLoading(true);
       setListError("");
       try {
-        const res = await axios.get<{tasks: TaskRowList[]}>(`${URL}/task`, {
+        const res = await axios.get<{tasks: TaskRowList[]}>(`${URL}/task/search`, {
           headers: { Authorization: `Bearer ${accessToken}` },
+          signal: controller.signal,
+          params: {
+            task_name: appliedTaskName || undefined,
+            project_id: appliedProjectId === "all" ? undefined : appliedProjectId,
+            status: appliedStatus === "all" ? undefined : appliedStatus,
+            priority: appliedPriority === "all" ? undefined : appliedPriority,
+          },
         });
-        setTasks(res.data.tasks);
+        if (!controller.signal.aborted) setTasks(res.data.tasks);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Failed to fetch tasks:", err);
         setListError(errorMessage(err));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     if (accessToken) fetchTasks();
-  }, [accessToken, taskListRefresh]);
+    return () => controller.abort();
+  }, [accessToken, taskListRefresh, appliedTaskName, appliedProjectId, appliedStatus, appliedPriority]);
 
+
+  //Fetch option for the Add Feild
   useEffect(() => {
     async function fetchOptions() {
       setOptionsLoading(true);
@@ -183,6 +203,8 @@ export default function Task({accessToken,role}: TaskProps) {
     if (accessToken) fetchOptions();
   }, [accessToken, optionsRefresh]);
 
+
+  //PopUp Card
   useEffect(() => {
     if (!selectedTask) return;
     const dialog = detailsRef.current;
