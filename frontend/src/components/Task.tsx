@@ -249,6 +249,16 @@ export default function Task({accessToken,role}: TaskProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function handleDueDateChange(value: string) {
+    if (!taskID && value && new Date(value).getTime() <= Date.now()) {
+      setDueDate("");
+      setError("Due date must be in the future.");
+      return;
+    }
+    setDueDate(value);
+    if (error === "Due date must be in the future.") setError("");
+  }
+
   // Use POST for a new task and PUT when revising an existing task.
   async function handleSaveTask() {
     if (saving) return;
@@ -259,6 +269,10 @@ export default function Task({accessToken,role}: TaskProps) {
     const date = dueDate ? new Date(dueDate) : null;
     if (date && !Number.isFinite(date.getTime())) {
       setError("Enter a valid due date.");
+      return;
+    }
+    if (!taskID && date && date.getTime() <= Date.now()) {
+      setError("Due date must be in the future.");
       return;
     }
     setSaving(true);
@@ -391,7 +405,7 @@ export default function Task({accessToken,role}: TaskProps) {
                 </select>
               </label>
               <label htmlFor="task-due-date" className="min-w-0 text-sm font-medium text-slate-700">Due date <span className="font-normal text-slate-400">(optional)</span>
-                <input id="task-due-date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} name="due_date" type="datetime-local" className="mt-2 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 focus:border-emerald-600" />
+                <input id="task-due-date" min={new Date().toISOString().slice(0,16)} value={dueDate} onChange={(event) => handleDueDateChange(event.target.value)} name="due_date" type="datetime-local" className="mt-2 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 focus:border-emerald-600" />
               </label>
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">

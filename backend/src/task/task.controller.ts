@@ -52,6 +52,9 @@ export async function addTask(req: Request, res: Response){
     try{
         const input = getTaskInput(req.body);
         if (typeof input === "string") return res.status(400).json({ message: input });
+        if (input.due_date && input.due_date.getTime() <= Date.now()) {
+            return res.status(400).json({ message: "Due date must be in the future" });
+        }
         const userId = res.locals.userId;
         if (!isValidId(userId)) return res.status(401).json({ message: "Invalid access token" });
         if (input.assigned_to !== null && !await isAuthorized(input.assigned_to, ["ADMIN", "PROJECT_MANAGER", "DEVELOPER"])) {
