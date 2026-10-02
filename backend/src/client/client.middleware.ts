@@ -16,7 +16,6 @@ export function requireClientAuth(...allowedRoles: string[]) {
 
   const token = header[1]
 
-  console.log(`token:${token}`)
 
   if (!token) {
     return res.status(401).json({ message: "An access token is required" });

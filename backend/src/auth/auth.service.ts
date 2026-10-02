@@ -24,7 +24,6 @@ export async function authenticateUser(username: string, password: string): Prom
         }
 
         const hashedPassword = await bcrypt.compare(password, user.rows[0].password_hash);
-        console.log("Password match result:", hashedPassword);
         if (!hashedPassword) {
             return null;
         }

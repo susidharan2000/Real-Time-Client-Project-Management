@@ -78,8 +78,6 @@ export default function ClientManager({accessToken}:ClientManagerProps) {
       SetError("Client Name Feild is Empty")
       return 
     }
-    console.log(clientname);
-    console.log(email);
     (async()=>{
       try{
       await axios.post(`${URL}/client`, {

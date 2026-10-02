@@ -1,5 +1,5 @@
 import { Request,Response } from "express";
-import { fetchProjectCount,fetchAllProject,fetchMyProjects,fetchProjectManagers,insertProject,updateProject,removeProject,isAuthorized } from "./project.service";
+import { fetchProjectCount,fetchAllProject,fetchMyProjects,fetchProjectManagers,insertProject,updateProject,removeProject,isAuthorized, fetchManagedProjectCount } from "./project.service";
 
 export async function getProjectCount(req: Request, res: Response){
     try{
@@ -23,8 +23,8 @@ export async function getAllProject(_req: Request, res: Response){
 
 export async function getMyProjects(_req: Request, res: Response){
     try{
-        const userId = res.locals.userId;
-        const projects = await fetchMyProjects(String(userId));
+        const userId:string = res.locals.userId;
+        const projects = await fetchMyProjects(userId);
         return res.status(200).json({projects});
     }catch(err){
         return res.status(500).json({message:"Could not fetch your projects"});
@@ -118,5 +118,17 @@ export async function deleteProject(req: Request, res: Response){
         }
         console.error("Failed to delete project:", err);
         return res.status(500).json({ message: "Could not delete project" });
+    }
+}
+
+
+export async function getMyProjectCount(_req: Request, res: Response){
+    try{
+        const userID = res.locals.userId;
+        const myProjectCount = await fetchManagedProjectCount(String(userID));
+        return res.status(200).json({myProjectCount: myProjectCount});
+    }
+    catch(err){
+        return res.status(500).json({message:"Could not fetch your project count"});
     }
 }

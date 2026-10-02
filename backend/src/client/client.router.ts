@@ -5,7 +5,7 @@ import { getClientCount, getClients, addClient, editClient, deleteClient } from 
 export const clientRouter = Router();
 
 clientRouter.get("/clientcount", requireClientAuth("ADMIN"),getClientCount);
-clientRouter.get("/", requireClientAuth("ADMIN"),getClients);
+clientRouter.get("/", requireClientAuth("ADMIN","PROJECT_MANAGER"),getClients);
 clientRouter.post("/", requireClientAuth("ADMIN"),addClient);
 clientRouter.put("/:id", requireClientAuth("ADMIN"),editClient);
 clientRouter.delete("/:id", requireClientAuth("ADMIN"),deleteClient);

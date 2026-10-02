@@ -16,7 +16,6 @@ function App() {
 
       axios.post(`${URL}/auth/checksession`,{}, {withCredentials:true})
       .then((res)=>{
-        console.log("Session check response:", res.data);
         setAccessToken(res.data.accessToken)
         setUsername(res.data.userName)
         setUserId(res.data.userId)

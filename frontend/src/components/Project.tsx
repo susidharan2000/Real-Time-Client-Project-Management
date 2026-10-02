@@ -27,9 +27,12 @@ type ManagerOption = {
 
 type ProjectProps = {
   accessToken: string;
+  role:string;
+  userId: string;
+  userName: string;
 };
 
-export default function Project({accessToken}: ProjectProps) {
+export default function Project({accessToken,role,userId,userName}: ProjectProps) {
   const [showAddComponentUI, setShowAddComponentUI] = useState(false);
   const [showEditComponentUI, setShowEditComponentUI] = useState(false);
   const [projects, setProjects] = useState<ProjectRowList[]>([]);
@@ -74,7 +77,18 @@ export default function Project({accessToken}: ProjectProps) {
       setLoading(true);
       setListError("");
       try {
-        const res = await axios.get<{ projects: ProjectRowList[] }>(`${URL}/project`, {
+        const endpoint =
+          role === "ADMIN" ? "/project" :
+          role === "PROJECT_MANAGER" ? "/project/my-projects" :
+          null;
+
+          if (!endpoint) {
+            setProjects([]);
+            setListError("You do not have permission to view projects.");
+          }
+        setLoading(true);
+        setListError("");
+        const res = await axios.get<{ projects: ProjectRowList[] }>(`${URL}${endpoint}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         setProjects(res.data.projects);
@@ -143,7 +157,7 @@ export default function Project({accessToken}: ProjectProps) {
         title: title.trim(),
         description: description.trim(),
         client_id: clientID,
-        project_manager_id: managerID || null,
+        project_manager_id: role === "PROJECT_MANAGER" ? userId : managerID || null,
       }, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -184,7 +198,7 @@ export default function Project({accessToken}: ProjectProps) {
         title: title.trim(),
         description: description.trim(),
         client_id: clientID,
-        project_manager_id: managerID || null,
+        project_manager_id: role === "PROJECT_MANAGER" ? userId : managerID || null,
       }, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -301,13 +315,19 @@ export default function Project({accessToken}: ProjectProps) {
                 </select>
                 {!optionsLoading && !optionsError && clients.length === 0 && <span className="mt-2 block text-xs font-normal text-slate-500">Add a client on the Clients page before creating a project.</span>}
               </label>
-              <label htmlFor="project-manager" className="text-sm font-medium text-slate-700">Project manager <span className="font-normal text-slate-400">(optional)</span>
-                <select disabled={optionsLoading || !!optionsError} id="project-manager" name="project_manager_id" value={managerID} onChange={(event) => setManagerID(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 focus:border-emerald-600">
-                  <option value="">Unassigned</option>
-                  {managerID && !managers.some((manager) => manager.id === managerID) && <option value={managerID} disabled>Current manager is unavailable — choose another or unassign</option>}
-                  {managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
+              <label htmlFor="project-manager" className="text-sm font-medium text-slate-700">Project manager {role === "ADMIN" && <span className="font-normal text-slate-400">(optional)</span>}
+                <select disabled={optionsLoading || !!optionsError} id="project-manager" name="project_manager_id" value={role === "PROJECT_MANAGER" ? userId : managerID} onChange={(event) => setManagerID(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 focus:border-emerald-600">
+                  {role === "PROJECT_MANAGER" ? (
+                    <option value={userId}>{userName}</option>
+                  ) : (
+                    <>
+                      <option value="">Unassigned</option>
+                      {managerID && !managers.some((manager) => manager.id === managerID) && <option value={managerID} disabled>Current manager is unavailable — choose another or unassign</option>}
+                      {managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
+                    </>
+                  )}
                 </select>
-                {!optionsLoading && !optionsError && managers.length === 0 && <span className="mt-2 block text-xs font-normal text-slate-500">No active project managers available. You can leave this unassigned.</span>}
+                {role === "ADMIN" && !optionsLoading && !optionsError && managers.length === 0 && <span className="mt-2 block text-xs font-normal text-slate-500">No active project managers available. You can leave this unassigned.</span>}
               </label>
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
@@ -332,6 +352,9 @@ export default function Project({accessToken}: ProjectProps) {
             onClientChange={setClientFilter}
             onManagerChange={setManagerFilter}
             onClear={clearFilters}
+            userRole={role}
+            userId={userId}
+            userName={userName}
           />
 
           <div className="overflow-x-auto">
@@ -410,7 +433,7 @@ export default function Project({accessToken}: ProjectProps) {
               <dt className="text-xs font-medium text-slate-500">Client</dt>
               <dd className="mt-1 text-sm font-semibold [overflow-wrap:anywhere]">{selectedProject.client_name}</dd>
             </div>
-            <div>
+           <div>
               <dt className="text-xs font-medium text-slate-500">Project manager</dt>
               <dd className="mt-1 text-sm font-semibold [overflow-wrap:anywhere]">{selectedProject.project_manager || "Unassigned"}</dd>
             </div>

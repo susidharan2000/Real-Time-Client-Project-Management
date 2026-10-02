@@ -84,7 +84,7 @@ function AdminDashboard({ username, accessToken, role }: AdminDashboardProps) {
 
     async function loadSummary() {
       try {
-        const { data } = await axios.get<SummaryResponse>(`${URL}/dashboard/getSummary`, {
+        const { data } = await axios.get<SummaryResponse>(`${URL}/dashboard/getAdminSummary`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: controller.signal,
           timeout: 10000,

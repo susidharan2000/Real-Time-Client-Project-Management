@@ -55,7 +55,6 @@ function LoginPage({ initialSession }: LoginPageProps) {
   }
 
   async function handleLogout() {
-    console.log("Logout...")
   try {
     const res = await axios.post(
       `${URL}/auth/logout`,

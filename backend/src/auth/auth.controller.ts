@@ -8,7 +8,6 @@ import { authenticateUser,verifyRefreshToken,RevokeRefreshToken,verifySession } 
 export const login = async (req: Request, res: Response) => {
         try{
             const {username, password} = req.body;
-            console.log("Authenticating user:", username);
 
             if (typeof username !== 'string' || typeof password !== 'string'){
                 return res.status(400).json({message: "Invalid username or password"});
@@ -56,7 +55,6 @@ export const logout = async (req: Request, res: Response) => {
         }
         // Revoke the refresh token in the database
         const isRevoked = await RevokeRefreshToken(refreshToken);
-        console.log("Refresh token revoked:", isRevoked);
         if (!isRevoked) {
             return res.status(400).json({message: "Failed to revoke refresh token"});
         }

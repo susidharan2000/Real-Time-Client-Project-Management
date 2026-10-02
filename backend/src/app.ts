@@ -10,7 +10,6 @@ import {clientRouter} from "./client/client.router.ts"
 
 export const app= express();
 
-console.log("FRONTEND_ORIGIN:",process.env.FRONTEND_ORIGIN);
 app.use(cors({
   origin: process.env.FRONTEND_ORIGIN,
   credentials: true,

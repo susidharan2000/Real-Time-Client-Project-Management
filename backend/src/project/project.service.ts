@@ -138,3 +138,13 @@ export async function removeProject(id: string, userId: string): Promise<boolean
 
   return res.rows.length > 0;
 }
+
+
+export async function fetchManagedProjectCount(userId: string): Promise<number> {
+  const res: QueryResult<any> = await pool.query(`
+                               SELECT COUNT(*):: int AS count
+                               FROM projects
+                               WHERE project_manager_id = $1 OR created_by = $1;
+                             `, [userId]);
+  return res.rows[0].count;
+}

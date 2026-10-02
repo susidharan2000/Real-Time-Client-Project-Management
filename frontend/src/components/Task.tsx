@@ -156,7 +156,8 @@ export default function Task({accessToken,role}: TaskProps) {
       setLoading(true);
       setListError("");
       try {
-        const res = await axios.get<{tasks: TaskRowList[]}>(`${URL}/task/search`, {
+        const endpoint = role === "ADMIN" ? "/task/search" : role === "PROJECT_MANAGER" ? "/task/created-by-me/search" : "/task/assigned-to-me/search";
+        const res = await axios.get<{tasks: TaskRowList[]}>(`${URL}${endpoint}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: controller.signal,
           params: {
@@ -428,7 +429,7 @@ export default function Task({accessToken,role}: TaskProps) {
               <input id="task-search" name="search" type="search" placeholder="Search by task name…" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm placeholder:text-slate-400 focus:border-emerald-600" value={taskNameFilter} onChange={(event)=>SetTaskNameFilter(event.target.value)} />
             </label>
             <label htmlFor="task-project-filter" className="text-sm font-medium text-slate-600">Project
-              <select id="task-project-filter" name="project_filter" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600" value={projectIDFiter} onChange={(event)=>{SetProjectIDFilter(event.target.value);console.log(event.target)}}>
+              <select id="task-project-filter" name="project_filter" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600" value={projectIDFiter} onChange={(event)=>SetProjectIDFilter(event.target.value)}>
                 <option value="all">All projects</option>
                 {projectListFilter.map((project)=>(
                   <option value={project.project_id} key={project.project_id}>{project.project_title}</option>
@@ -436,7 +437,7 @@ export default function Task({accessToken,role}: TaskProps) {
               </select>
             </label>
             <label htmlFor="task-status-filter" className="text-sm font-medium text-slate-600">Status
-              <select id="task-status-filter" name="status_filter" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600" value={statusFilter} onChange={(event)=>{SetStatusFilter(event.target.value);console.log(event.target.value)}}>
+              <select id="task-status-filter" name="status_filter" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600" value={statusFilter} onChange={(event)=>SetStatusFilter(event.target.value)}>
                 <option value="all">All statuses</option>
                 <option value="TO_DO">To do</option>
                 <option value="IN_PROGRESS">In progress</option>
@@ -447,7 +448,7 @@ export default function Task({accessToken,role}: TaskProps) {
             <label htmlFor="task-priority-filter" className="text-sm font-medium text-slate-600">Priority
               <select id="task-priority-filter" name="priority_filter" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600"
               value={priorityFilter}
-              onChange={(event)=>{SetPriorityFilter(event.target.value);console.log(event.target.value)}}>
+              onChange={(event)=>SetPriorityFilter(event.target.value)}>
                 <option value="all">All priorities</option>
                 <option value="LOW">Low</option>
                 <option value="MEDIUM">Medium</option>

@@ -1,6 +1,49 @@
 import { QueryResult } from "pg";
 import {pool} from "../db/pool.ts"
 
+
+export type TaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export type Task = {
+  task_id: string;
+  title: string;
+  description: string | null;
+  project_id: string;
+  project_title: string;
+  assigned_to_userid: string | null;
+  assigned_to_user_name: string | null;
+  created_by_userid: string;
+  created_by_user_name: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: Date | null;
+  is_overdue: boolean;
+};
+
+export type TaskInput = {
+  title: string;
+  description: string | null;
+  project_id: string;
+  assigned_to: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: Date | null;
+};
+
+export type Project = {
+    project_id:number
+    project_title:string
+}
+
+export type UpcomingTask = {
+  task_id: string;
+  title: string;
+  project_title: string;
+  due_date: Date;
+  status: TaskStatus;
+}
+
 export async function fetchTaskCount(): Promise<number> {
   const result = await pool.query<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM tasks;"
@@ -34,7 +77,7 @@ export async function fetchOverDueTaskCount(): Promise<number> {
   return result.rows[0].count;
 }
 
-type TaskCounts = {
+export type TaskCounts = {
   todo: number;
   inprocess: number;
   in_review: number;
@@ -50,39 +93,10 @@ export async function fetchTaskCountbyStatus(): Promise<TaskCounts> {
        COUNT(*) FILTER (WHERE status = 'DONE')::int AS done
      FROM tasks;`
   );
-  //console.log(result)
 
   return result.rows[0];
 }
 
-export type TaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
-export type Task = {
-  task_id: string;
-  title: string;
-  description: string | null;
-  project_id: string;
-  project_title: string;
-  assigned_to_userid: string | null;
-  assigned_to_user_name: string | null;
-  created_by_userid: string;
-  created_by_user_name: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  due_date: Date | null;
-  is_overdue: boolean;
-};
-
-export type TaskInput = {
-  title: string;
-  description: string | null;
-  project_id: string;
-  assigned_to: string | null;
-  status: TaskStatus;
-  priority: TaskPriority;
-  due_date: Date | null;
-};
 
 export async function fetchTask(): Promise<Task[]> {
   const res = await pool.query<Task>(`
@@ -152,10 +166,6 @@ export async function removeTask(id: string): Promise<boolean> {
   return res.rows.length > 0;
 }
 
-export type Project = {
-    project_id:number
-    project_title:string
-}
 export async function fetchProjectsWithTasksCreatedByMe(userId: string):Promise<Project[]>{
   const res = await pool.query<Project>(`
     SELECT p.project_id, p.title AS project_title
@@ -209,48 +219,103 @@ type TaskFilters = {
 };
 
 export async function searchAllTasksService(filters: TaskFilters):Promise<Task[]>{
-  const conditions: string[] = [];
-  const values: string[] = [];
 
-  if (filters.task_name) {
-    values.push(`%${filters.task_name.replace(/[\\%_]/g, "\\$&")}%`);
-    conditions.push(`t.title ILIKE $${values.length}`);
-  }
-  if (filters.project_id) {
-    values.push(filters.project_id);
-    conditions.push(`t.project_id = $${values.length}`);
-  }
-  if (filters.status) {
-    values.push(filters.status);
-    conditions.push(`t.status = $${values.length}`);
-  }
-  if (filters.priority) {
-    values.push(filters.priority);
-    conditions.push(`t.priority = $${values.length}`);
-  }
+  const res = await pool.query<Task>(
+  `SELECT
+     t.task_id, t.title, t.description, t.project_id,
+     p.title AS project_title,
+     t.assigned_to AS assigned_to_userid,
+     assignee.user_name AS assigned_to_user_name,
+     t.created_by AS created_by_userid,
+     creator.user_name AS created_by_user_name,
+     t.status, t.priority, t.due_date,
+     COALESCE(t.due_date < NOW() AND t.status <> 'DONE', false) AS is_overdue
+   FROM tasks t
+   JOIN projects p ON t.project_id = p.project_id
+   LEFT JOIN users assignee ON t.assigned_to = assignee.user_id
+   JOIN users creator ON t.created_by = creator.user_id
+   WHERE ($1::text IS NULL OR t.title ILIKE '%' || $1 || '%')
+     AND ($2::bigint IS NULL OR t.project_id = $2)
+     AND ($3::text IS NULL OR t.status = $3)
+     AND ($4::text IS NULL OR t.priority = $4)
+   ORDER BY t.created_at DESC, t.task_id DESC`,
+  [
+    filters.task_name || null,
+    filters.project_id || null,
+    filters.status || null,
+    filters.priority || null,
+  ]
+);
+  return res.rows;
+}
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const res = await pool.query<Task>(`
-    SELECT
-      t.task_id,
-      t.title,
-      t.description,
-      t.project_id,
-      p.title AS project_title,
-      t.assigned_to AS assigned_to_userid,
-      assignee.user_name AS assigned_to_user_name,
-      t.created_by AS created_by_userid,
-      creator.user_name AS created_by_user_name,
-      t.status,
-      t.priority,
-      t.due_date,
-      COALESCE(t.due_date < NOW() AND t.status <> 'DONE', false) AS is_overdue
+
+export async function fetchCreatedTaskCount(userId: string):Promise<number>{
+  const res:QueryResult<any> = await pool.query(`SELECT COUNT(*)::int AS count FROM tasks WHERE created_by = $1;`, [userId]);
+  return res.rows[0].count;
+}
+
+export async function fetchCreatedOverdueTaskCount(userId: string):Promise<number>{
+  const res:QueryResult<any> = await pool.query(`SELECT COUNT(*)::int AS count FROM tasks WHERE created_by = $1 AND due_date < NOW() AND status <> 'DONE';`, [userId]);
+  return res.rows[0].count;
+}
+
+
+export async function fetchCreatedTaskCountByStatus(userId: string):Promise<TaskCounts>{
+  const res:QueryResult<any> = await pool.query(`
+    SELECT 
+      COUNT(*) FILTER (WHERE status = 'TO_DO')::int AS todo,
+      COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int AS inprocess,
+      COUNT(*) FILTER (WHERE status = 'IN_REVIEW')::int AS in_review,
+      COUNT(*) FILTER (WHERE status = 'DONE')::int AS done
+    FROM tasks
+    WHERE created_by = $1;
+    `,[userId]);
+    return res.rows[0];
+
+}
+
+export async function fetchUpcomingTaskByDueDateForManager(userId: string):Promise<UpcomingTask[]>{
+  const res:QueryResult<any> = await pool.query(`
+    SELECT t.task_id, t.title, p.title AS project_title, t.due_date, t.status
     FROM tasks t
     JOIN projects p ON t.project_id = p.project_id
-    LEFT JOIN users assignee ON t.assigned_to = assignee.user_id
-    JOIN users creator ON t.created_by = creator.user_id
-    ${where}
-    ORDER BY t.created_at DESC, t.task_id DESC;
-  `, values);
+    WHERE t.created_by = $1 AND t.due_date > NOW() AND t.status <> 'DONE'
+    ORDER BY t.due_date ASC LIMIT 5;
+  `,[userId]
+    );
+  return res.rows;
+}
+
+
+export async function fetchTasksCreatedByMe(filters: TaskFilters, userId: string):Promise<Task[]>{
+  const res = await pool.query<Task>(
+  `SELECT
+     t.task_id, t.title, t.description, t.project_id,
+     p.title AS project_title,
+     t.assigned_to AS assigned_to_userid,
+     assignee.user_name AS assigned_to_user_name,
+     t.created_by AS created_by_userid,
+     creator.user_name AS created_by_user_name,
+     t.status, t.priority, t.due_date,
+     COALESCE(t.due_date < NOW() AND t.status <> 'DONE', false) AS is_overdue
+   FROM tasks t
+   JOIN projects p ON t.project_id = p.project_id
+   LEFT JOIN users assignee ON t.assigned_to = assignee.user_id
+   JOIN users creator ON t.created_by = creator.user_id
+   WHERE ($1::text IS NULL OR t.title ILIKE '%' || $1 || '%')
+     AND ($2::bigint IS NULL OR t.project_id = $2)
+     AND ($3::text IS NULL OR t.status = $3)
+     AND ($4::text IS NULL OR t.priority = $4)
+     AND t.created_by = $5
+   ORDER BY t.created_at DESC, t.task_id DESC`,
+  [
+    filters.task_name || null,
+    filters.project_id || null,
+    filters.status || null,
+    filters.priority || null,
+    userId
+  ]
+);
   return res.rows;
 }

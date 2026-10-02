@@ -13,9 +13,12 @@ type ProjectFiltersProps = {
   onClientChange: (value: string) => void;
   onManagerChange: (value: string) => void;
   onClear: () => void;
+  userRole: string;
+  userId: string;
+  userName: string;
 };
 
-export default function ProjectFilters({search, clientFilter, managerFilter, clients, managers, onSearchChange, onClientChange, onManagerChange, onClear}: ProjectFiltersProps) {
+export default function ProjectFilters({search, clientFilter, managerFilter, clients, managers, onSearchChange, onClientChange, onManagerChange, onClear, userRole, userId, userName}: ProjectFiltersProps) {
   return (
     <div className="grid gap-4 border-b border-slate-200 px-5 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
       <label htmlFor="project-search" className="text-sm font-medium text-slate-600">Search projects
@@ -30,10 +33,18 @@ export default function ProjectFilters({search, clientFilter, managerFilter, cli
       </label>
       <label htmlFor="project-manager-filter" className="text-sm font-medium text-slate-600">Manager
         <select id="project-manager-filter" name="manager_filter" value={managerFilter} onChange={(event) => onManagerChange(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600">
-          <option value="all">All managers</option>
+          {userRole === "PROJECT_MANAGER" ?(
+            <>
+            <option value={userId}>{userName}</option>
+            </>
+          ):(
+            <>
+            <option value="all">All managers</option>
           <option value="unassigned">Unassigned</option>
           {managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
           {managerFilter !== "all" && managerFilter !== "unassigned" && !managers.some((manager) => manager.id === managerFilter) && <option value={managerFilter}>Selected manager (no projects)</option>}
+            </>
+          )}
         </select>
       </label>
       <button type="button" onClick={onClear} className="min-h-11 self-end rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:cursor-pointer hover:bg-slate-100">Clear filters</button>

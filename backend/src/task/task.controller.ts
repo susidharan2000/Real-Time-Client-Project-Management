@@ -1,5 +1,5 @@
 import { Request,Response } from "express";
-import { Task,TaskInput,TaskStatus,TaskPriority,fetchTaskCount,fetchOverDueTaskCount,fetchTaskCountbyStatus,fetchTask,fetchTaskAssignees,insertTask,updateTask,removeTask,isAuthorized,fetchProjectWithAtleastOneTask,Project,fetchProjectsWithTasksCreatedByMe,fetchProjectsWithTasksAssignedToMe,searchAllTasksService } from "./task.service";
+import { Task,TaskInput,TaskStatus,TaskPriority,fetchTaskCount,fetchOverDueTaskCount,fetchTaskCountbyStatus,fetchTask,fetchTaskAssignees,insertTask,updateTask,removeTask,isAuthorized,fetchProjectWithAtleastOneTask,Project,fetchProjectsWithTasksCreatedByMe,fetchProjectsWithTasksAssignedToMe,searchAllTasksService,fetchCreatedTaskCount, fetchCreatedOverdueTaskCount,fetchCreatedTaskCountByStatus,fetchUpcomingTaskByDueDateForManager, UpcomingTask, fetchTasksCreatedByMe } from "./task.service";
 export async function getTaskCount(_req: Request, res: Response){
     try{
         const totalTask:number = await fetchTaskCount()
@@ -208,5 +208,84 @@ export async function searchAllTasks(req: Request, res: Response){
 
     }catch(error){
          return res.status(500).json({ message: "Could not search All Task" });
+    }
+}
+
+export async function getMyTasksCount(_req: Request, res: Response){
+    try{
+        const userId = res.locals.userId;
+        const totalMyTask = await fetchCreatedTaskCount(String(userId));
+        return res.status(200).json({ totalMyTask });
+    }catch(error){
+        return res.status(500).json({ message: "Could not fetch my task count" });
+    }
+}
+
+export async function getCreatedOverdueTaskCount(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const totalMyOverdueTask = await fetchCreatedOverdueTaskCount(userId);
+        return res.status(200).json({ totalMyOverdueTask });
+    }catch(error){
+        return res.status(500).json({ message: "Could not fetch my overdue task count" });
+    }
+}
+
+
+export async function getCreatedTaskCountByStatus(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const taskCountByStats = await fetchCreatedTaskCountByStatus(userId);
+        return res.status(200).json({  taskCountByStats });
+    }catch(err){
+        return res.status(500).json({message:"Counld not fetch  Task by Status Count"})
+    }
+}  
+
+
+export async function getUpcomingTaskByDueDateCreatedByMe(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const upcomingDueTasks: UpcomingTask[] = await fetchUpcomingTaskByDueDateForManager(userId);
+        return res.status(200).json({ upcomingDueTasks });
+    }catch(error){
+        return res.status(500).json({ message: "Could not fetch upcoming due tasks created by you" });
+    }
+}
+
+
+export async function searchTasksCreatedByMe(req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId; 
+        const { task_name, project_id, status, priority } = req.query;
+         
+         for (const value of [task_name, project_id, status, priority]){
+            if (value !== undefined && typeof value !== "string") {
+                return res.status(400).json({message: "Invalid search filters",});
+            }
+         }
+         const filters = {
+            task_name: typeof task_name === "string" ? task_name.trim() : undefined,
+            project_id: typeof project_id === "string" ? project_id.trim() : undefined,
+            status: typeof status === "string" ? status.trim() : undefined,
+            priority: typeof priority === "string" ? priority.trim() : undefined,
+         };
+         if (filters.project_id === "all") filters.project_id = undefined;
+         if (filters.status === "all") filters.status = undefined;
+         if (filters.priority === "all") filters.priority = undefined;
+
+         if (filters.status && !["TO_DO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(filters.status)) {
+            return res.status(400).json({message: "Invalid task status"});
+         }
+         if (filters.priority && !["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(filters.priority)) {
+            return res.status(400).json({message: "Invalid task priority"});
+         }
+
+        const tasks = await fetchTasksCreatedByMe(filters, userId);
+        return res.status(200).json({ tasks });
+
+    }
+    catch(error){
+        return res.status(500).json({ message: "Could not search tasks created by you" });
     }
 }

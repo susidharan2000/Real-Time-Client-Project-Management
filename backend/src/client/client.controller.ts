@@ -25,7 +25,6 @@ export const addClient = async (req: Request, res: Response) => {
   try {
     const { name, email } = req.body ?? {};
 
-    //console.log("clinet Nmae:",name);
 
     if (typeof name !== "string" || !name.trim() || name.trim().length > 200) {
       return res.status(400).json({ message: "Client name must contain 1 to 200 characters" });

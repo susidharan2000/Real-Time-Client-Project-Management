@@ -25,16 +25,16 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout, notifica
           <Route path="/" element={role === "ADMIN" ? (
             <AdminDashboard username={userName} userId={userId} accessToken={accessToken} role={role} />
           ) : role === "PROJECT_MANAGER" ? (
-            <ProjectManagerDashboard username={userName} userId={userId} />
+            <ProjectManagerDashboard username={userName} userId={userId} accessToken={accessToken} role={role}/>
           ) : role === "DEVELOPER" ? (
             <DeveloperDashboard username={userName} userId={userId} />
           ) : (
             <p>Invalid role</p>
           )} />
           
-          {role === "ADMIN" && <>
+          {(role === "ADMIN" || role === "PROJECT_MANAGER") && <>
             <Route path="/clients" element={<ClientManager accessToken={accessToken} />} />
-            <Route path="/projects" element={<Project accessToken={accessToken} />} />
+            <Route path="/projects" element={<Project accessToken={accessToken} role={role} userId={userId} userName = {userName} />} />
             <Route path="/tasks" element={<Task accessToken={accessToken} role={role} />} />
           </>}
           <Route path="*" element={<Navigate to="/" replace />} />

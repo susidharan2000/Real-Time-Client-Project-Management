@@ -17,7 +17,6 @@ export function requireTaskAuth(...allowedRoles: string[]) {
     
       const token = header[1]
     
-      console.log(`Project token:${token}`)
     
       if (!token) {
         return res.status(401).json({ message: "An access token is required" });
@@ -35,13 +34,11 @@ export function requireTaskAuth(...allowedRoles: string[]) {
         }
     
         const userId = payload.user_id;
-        console.log(userId)
     
         const authorized:Boolean = await isAuthorized(userId, allowedRoles)
-        //console.log(authorized)
     
         if (!authorized){
-             return res.status(403).json({ message: "Admin access required" });
+             return res.status(403).json({ message: "Unauthorized User" });
         }
         res.locals.userId = userId;
       } catch {
