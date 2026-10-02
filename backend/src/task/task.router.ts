@@ -23,7 +23,7 @@ taskRouter.put("/:id", requireTaskAuth("ADMIN","PROJECT_MANAGER"),editTask);
 taskRouter.delete("/:id", requireTaskAuth("ADMIN","PROJECT_MANAGER"),deleteTask);
 
 // get PROJECT BY TASK
-taskRouter.get("/projects",requireTaskAuth("ADMIN","PROJECT_MANAGER"),getProjectWithAtleastOneTask);//get project atleast the project has atleast one Project
+taskRouter.get("/projects",requireTaskAuth("ADMIN"),getProjectWithAtleastOneTask);//get project atleast the project has atleast one Project
 taskRouter.get("/created-by-me/projects",requireTaskAuth("ADMIN", "PROJECT_MANAGER"),getProjectsWithTasksCreatedByMe);
 taskRouter.get("/assigned-to-me/projects",requireTaskAuth("DEVELOPER"),getProjectsWithTasksAssignedToMe);
 

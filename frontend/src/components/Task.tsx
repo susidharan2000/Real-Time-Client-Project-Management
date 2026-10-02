@@ -104,7 +104,11 @@ export default function Task({accessToken,role}: TaskProps) {
         }else{
           return;
         }
-        const res = await axios.get<{projects: {project_id: string; project_title: string}[]}>(`${URL}${endpoint}`, {
+        type Projects = {
+          project_id:string;
+          project_title: string
+        }
+        const res = await axios.get<{projects: Projects[]}>(`${URL}${endpoint}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         SetProjectListfilter(res.data.projects);
@@ -156,7 +160,7 @@ export default function Task({accessToken,role}: TaskProps) {
       setLoading(true);
       setListError("");
       try {
-        const endpoint = role === "ADMIN" ? "/task/search" : role === "PROJECT_MANAGER" ? "/task/created-by-me/search" : "/task/assigned-to-me/search";
+        const endpoint = role === "ADMIN" ? "/task/search" : role === "PROJECT_MANAGER" && "/task/created-by-me/search";
         const res = await axios.get<{tasks: TaskRowList[]}>(`${URL}${endpoint}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: controller.signal,
@@ -187,11 +191,13 @@ export default function Task({accessToken,role}: TaskProps) {
       setOptionsLoading(true);
       setOptionsError("");
       try {
+        const endpoint = role === "ADMIN" ? "/project" : "/project/my-projects";
         const config = { headers: { Authorization: `Bearer ${accessToken}` } };
         const [projectRes, assigneeRes] = await Promise.all([
-          axios.get<{projects: ProjectOption[]}>(`${URL}/project`, config),
+          axios.get<{projects: ProjectOption[]}>(`${URL}${endpoint}`, config),
           axios.get<{assignees: AssigneeOption[]}>(`${URL}/task/assignees`, config),
         ]);
+        console.log("Fetched projects:", projectRes.data.projects);
         setProjects(projectRes.data.projects);
         setAssignees(assigneeRes.data.assignees);
       } catch (err) {
