@@ -6,6 +6,7 @@ import { Navigate, Route, Routes } from "react-router";
 import ClientManager from "../components/ClientManager";
 import Project from "../components/Project";
 import Task from "../components/Task";
+import DeveloperTasks from "../components/DeveloperTasks";
 
 type DashboardProps = {
   userName: string;
@@ -27,7 +28,7 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout, notifica
           ) : role === "PROJECT_MANAGER" ? (
             <ProjectManagerDashboard username={userName} userId={userId} accessToken={accessToken} role={role}/>
           ) : role === "DEVELOPER" ? (
-            <DeveloperDashboard username={userName} userId={userId} />
+            <DeveloperDashboard username={userName} userId={userId} accessToken={accessToken} role={role} />
           ) : (
             <p>Invalid role</p>
           )} />
@@ -36,6 +37,11 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout, notifica
             <Route path="/clients" element={<ClientManager accessToken={accessToken} />} />
             <Route path="/projects" element={<Project accessToken={accessToken} role={role} userId={userId} userName = {userName} />} />
             <Route path="/tasks" element={<Task accessToken={accessToken} role={role} />} />
+          </>}
+
+          {(role === "DEVELOPER") && <>
+              <Route path="/DeveloperTasks" element={<DeveloperTasks accessToken={accessToken }/>} />
+              <Route path="/tasks" element={<Navigate to="/DeveloperTasks" replace />} />
           </>}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

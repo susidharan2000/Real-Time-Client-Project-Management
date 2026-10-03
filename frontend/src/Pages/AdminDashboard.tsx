@@ -64,7 +64,7 @@ function SummaryCard({ href, className, children }: { href?: string; className: 
   return href ? <Link to={href} className={`${styles} ${focusStyle}`}>{children}</Link> : <div className={styles}>{children}</div>;
 }
 
-function AdminDashboard({ username, accessToken, role }: AdminDashboardProps) {
+function AdminDashboard({ username, accessToken }: AdminDashboardProps) {
   const [totalClients, setTotalClients] = useState(0);
   const [totalProjects, setTotalProjects] = useState(0);
   const [totalTasks, setTotalTasks] = useState(0);

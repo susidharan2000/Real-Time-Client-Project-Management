@@ -19,7 +19,7 @@ export default function ClientManager({accessToken}:ClientManagerProps) {
   const[clients,setClients] = useState<ClientRowList[]>([])
 
   // set errors
-  const [error,SetError] = useState("")
+  const [,SetError] = useState("")
 
   //client list
   const[clientID,setClientID] = useState<number>(0)

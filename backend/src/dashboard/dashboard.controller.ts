@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { fetchClientCount } from "../client/client.service.ts";
 import { fetchProjectCount,fetchManagedProjectCount } from "../project/project.service.ts";
-import {fetchCreatedTaskCount,fetchCreatedOverdueTaskCount, fetchCreatedTaskCountByStatus,fetchUpcomingTaskByDueDateForManager, UpcomingTask, TaskCounts} from "../task/task.service.ts"
+import {fetchCreatedTaskCount,fetchCreatedOverdueTaskCount, fetchCreatedTaskCountByStatus,fetchUpcomingTaskByDueDateForManager, UpcomingTask, TaskCounts, fetchAssignedTaskCount,fetchAssignedOverdueTaskCount, fetchAssignedTaskCountByStatusCount,AssignedUpcomingTask,fetchUpcomingAssignedTasks} from "../task/task.service.ts"
 import {
   fetchTaskCount,
   fetchOverDueTaskCount,
@@ -58,5 +58,28 @@ export async function getProjectmanagerSummary(_req: Request, res: Response){
   catch (error) {
     console.error("Failed to fetch project manager summary:", error);
     return res.status(500).json({ message: "Could not fetch project manager summary" });
+  }
+}
+
+
+export async function getDeveloperSummary(_req: Request, res: Response){
+  try{
+    const userID:string = res.locals.userId;
+    const [totalTasksAssignedToMe,totalOverdueTasksAssignedToMe, totalTaskCountByStatus, AssignedUpcomingTasks]: [number, number, TaskCounts, AssignedUpcomingTask[]] = await Promise.all([
+                fetchAssignedTaskCount(userID),
+                fetchAssignedOverdueTaskCount(userID),
+                fetchAssignedTaskCountByStatusCount(userID),
+                fetchUpcomingAssignedTasks(userID)
+        ])
+
+    return res.status(200).json({
+      totalTasksAssignedToMe,
+      totalOverdueTasksAssignedToMe,
+      totalTaskCountByStatus,
+      AssignedUpcomingTasks,
+    });
+  }
+  catch(error){
+    return res.status(500).json({ message: "Could not fetch developer summary" });
   }
 }

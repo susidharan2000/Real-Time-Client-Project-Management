@@ -44,6 +44,22 @@ export type UpcomingTask = {
   status: TaskStatus;
 }
 
+export type AssignedUpcomingTask = {
+  task_id: string;
+  title: string;
+  description: string | null;
+  project_id: string;
+  project_title: string;
+  assigned_to_userid: string | null;
+  assigned_to_user_name: string | null;
+  created_by_userid: string;
+  created_by_user_name: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: Date | null;
+  is_overdue: boolean;
+}
+
 export async function fetchTaskCount(): Promise<number> {
   const result = await pool.query<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM tasks;"
@@ -308,6 +324,90 @@ export async function fetchTasksCreatedByMe(filters: TaskFilters, userId: string
      AND ($3::text IS NULL OR t.status = $3)
      AND ($4::text IS NULL OR t.priority = $4)
      AND t.created_by = $5
+   ORDER BY t.created_at DESC, t.task_id DESC`,
+  [
+    filters.task_name || null,
+    filters.project_id || null,
+    filters.status || null,
+    filters.priority || null,
+    userId
+  ]
+);
+  return res.rows;
+}
+
+
+export async function fetchAssignedTaskCount(userId: string):Promise<number>{
+  const res:QueryResult<any> = await pool.query(`SELECT COUNT(*)::int AS count FROM tasks WHERE assigned_to = $1;`, [userId]);
+  return res.rows[0].count;
+}
+
+export async function fetchAssignedOverdueTaskCount(userId: string):Promise<number>{
+  const res:QueryResult<any> = await pool.query(`SELECT COUNT(*)::int AS count FROM tasks WHERE assigned_to = $1 AND due_date < NOW() AND status <> 'DONE';`, [userId]);
+  return res.rows[0].count;
+}
+
+export async function fetchAssignedTaskCountByStatusCount(userId: string):Promise<TaskCounts>{
+  const res:QueryResult<any> = await pool.query(`
+    SELECT 
+      COUNT(*) FILTER (WHERE status = 'TO_DO')::int AS todo,
+      COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int AS inprocess,
+      COUNT(*) FILTER (WHERE status = 'IN_REVIEW')::int AS in_review,
+      COUNT(*) FILTER (WHERE status = 'DONE')::int AS done
+    FROM tasks
+    WHERE assigned_to = $1;
+  `,[userId]);
+  return res.rows[0];
+}
+
+
+export async function fetchUpcomingAssignedTasks(userId: string):Promise<Task[]>{
+  const res = await pool.query<Task>(
+    `SELECT
+       t.task_id, t.title, t.description, t.project_id,
+       p.title AS project_title,
+       t.assigned_to AS assigned_to_userid,
+       assignee.user_name AS assigned_to_user_name,
+       t.created_by AS created_by_userid,
+       creator.user_name AS created_by_user_name,
+       t.status, 
+       t.priority, 
+       t.due_date,
+       COALESCE(t.due_date < NOW() AND t.status <> 'DONE', false) AS is_overdue
+     FROM tasks t
+     JOIN projects p ON t.project_id = p.project_id
+     LEFT JOIN users assignee ON t.assigned_to = assignee.user_id
+     JOIN users creator ON t.created_by = creator.user_id
+     WHERE t.assigned_to = $1
+     AND t.status <> 'DONE'
+     ORDER BY t.created_at DESC, t.task_id DESC
+     LIMIT 10;`,
+    [userId]
+  );
+  return res.rows;
+}
+
+
+export async function fetchTasksAssignedToMe(userId:string,filters:any):Promise<Task[]>{
+  const res = await pool.query<Task>(
+  `SELECT
+     t.task_id, t.title, t.description, t.project_id,
+     p.title AS project_title,
+     t.assigned_to AS assigned_to_userid,
+     assignee.user_name AS assigned_to_user_name,
+     t.created_by AS created_by_userid,
+     creator.user_name AS created_by_user_name,
+     t.status, t.priority, t.due_date,
+     COALESCE(t.due_date < NOW() AND t.status <> 'DONE', false) AS is_overdue
+   FROM tasks t
+   JOIN projects p ON t.project_id = p.project_id
+   JOIN users assignee ON t.assigned_to = assignee.user_id
+   JOIN users creator ON t.created_by = creator.user_id
+   WHERE ($1::text IS NULL OR t.title ILIKE '%' || $1 || '%')
+     AND ($2::bigint IS NULL OR t.project_id = $2)
+     AND ($3::text IS NULL OR t.status = $3)
+     AND ($4::text IS NULL OR t.priority = $4)
+     AND t.assigned_to = $5
    ORDER BY t.created_at DESC, t.task_id DESC`,
   [
     filters.task_name || null,

@@ -1,5 +1,5 @@
 import { Request,Response } from "express";
-import { Task,TaskInput,TaskStatus,TaskPriority,fetchTaskCount,fetchOverDueTaskCount,fetchTaskCountbyStatus,fetchTask,fetchTaskAssignees,insertTask,updateTask,removeTask,isAuthorized,fetchProjectWithAtleastOneTask,Project,fetchProjectsWithTasksCreatedByMe,fetchProjectsWithTasksAssignedToMe,searchAllTasksService,fetchCreatedTaskCount, fetchCreatedOverdueTaskCount,fetchCreatedTaskCountByStatus,fetchUpcomingTaskByDueDateForManager, UpcomingTask, fetchTasksCreatedByMe } from "./task.service";
+import { Task,TaskInput,TaskStatus,TaskPriority,fetchTaskCount,fetchOverDueTaskCount,fetchTaskCountbyStatus,fetchTask,fetchTaskAssignees,insertTask,updateTask,removeTask,isAuthorized,fetchProjectWithAtleastOneTask,Project,fetchProjectsWithTasksCreatedByMe,fetchProjectsWithTasksAssignedToMe,searchAllTasksService,fetchCreatedTaskCount, fetchCreatedOverdueTaskCount,fetchCreatedTaskCountByStatus,fetchUpcomingTaskByDueDateForManager, UpcomingTask, fetchTasksCreatedByMe, fetchAssignedTaskCount ,fetchAssignedOverdueTaskCount,fetchAssignedTaskCountByStatusCount,fetchUpcomingAssignedTasks,fetchTasksAssignedToMe} from "./task.service";
 export async function getTaskCount(_req: Request, res: Response){
     try{
         const totalTask:number = await fetchTaskCount()
@@ -288,4 +288,84 @@ export async function searchTasksCreatedByMe(req: Request, res: Response){
     catch(error){
         return res.status(500).json({ message: "Could not search tasks created by you" });
     }
+}
+
+
+export async function getAssignedTaskCount(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const totalAssignedTask = await fetchAssignedTaskCount(userId);
+        return res.status(200).json({ totalAssignedTask });
+    }catch(error){
+        return res.status(500).json({ message: "Could not fetch assigned task count" });
+    }
+}
+
+export async function getAssignedOverdueTaskCount(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const totalAssignedOverdueTask = await fetchAssignedOverdueTaskCount(userId);
+        return res.status(200).json({ totalAssignedOverdueTask });
+    }catch(error){
+        return res.status(500).json({ message: "Could not fetch assigned overdue task count" });
+    }
+}
+
+export async function getAssignedTaskCountByStatusCount(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const taskCounts = await fetchAssignedTaskCountByStatusCount(userId);
+        return res.status(200).json({ taskCounts });
+    }catch(error){
+        return res.status(500).json({ message: "Could not fetch assigned task count by status" });
+    }
+}
+
+
+export async function getUpcomingAssignedTasks(_req: Request, res: Response){
+    try{
+        const userId:string = res.locals.userId;
+        const tasks:Task[] = await fetchUpcomingAssignedTasks(userId);
+        return res.status(200).json({ tasks });
+    }
+    catch(error){
+        return res.status(500).json({ message: "Could not fetch assigned tasks" });
+    }
+}
+
+export async function searchTasksAssignedToMe(req:Request, res: Response){
+    const userId:string = res.locals.userId;
+    let { task_name, project_id, status, priority } = req.query;
+
+
+    for(let value of [task_name, project_id, status, priority]){
+            if (typeof value  !== "string" && value !== undefined){
+                return res.status(500).json({message:"Invalid Filter Types"})
+            }
+    }
+
+    if (typeof status === "string"  && !["TO_DO", "IN_PROGRESS", "IN_REVIEW", "DONE"].includes(status)) {
+        return res.status(400).json({ message: "Invalid task status" });
+    }
+
+    if (typeof priority === "string"  && !["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(priority)) {
+        return res.status(400).json({message: "Invalid task priority"});
+    }
+
+    task_name === "all" && (task_name = undefined)
+    project_id === "all" && (project_id = undefined)
+    status === "all" && (status = undefined)
+    priority === "all" && (priority = undefined)
+
+    const filter = {
+        task_name: typeof task_name === "string"?task_name:undefined,
+        project_id:typeof project_id === "string"?project_id:undefined,
+        status:typeof status === "string"?status:undefined,
+        priority:typeof priority === "string"?priority:undefined
+    }
+
+
+    const tasks: Task[] = await fetchTasksAssignedToMe(userId, filter);
+    return res.status(200).json({ tasks });
+
 }

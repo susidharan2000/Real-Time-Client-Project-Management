@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireTaskAuth } from "./task.middleware";
-import { getTaskCount,getAllOverDueTaskCount,getTaskCountByStatus,getAllTask,getTaskAssignees,addTask,editTask,deleteTask,getProjectWithAtleastOneTask,getProjectsWithTasksCreatedByMe,getProjectsWithTasksAssignedToMe,searchAllTasks,getMyTasksCount,getCreatedOverdueTaskCount,getCreatedTaskCountByStatus,getUpcomingTaskByDueDateCreatedByMe, searchTasksCreatedByMe} from "./task.controller"
+import { getTaskCount,getAllOverDueTaskCount,getTaskCountByStatus,getAllTask,getTaskAssignees,addTask,editTask,deleteTask,getProjectWithAtleastOneTask,getProjectsWithTasksCreatedByMe,getProjectsWithTasksAssignedToMe,searchAllTasks,getMyTasksCount,getCreatedOverdueTaskCount,getCreatedTaskCountByStatus,getUpcomingTaskByDueDateCreatedByMe, searchTasksCreatedByMe,getAssignedTaskCount,getAssignedOverdueTaskCount,getAssignedTaskCountByStatusCount,getUpcomingAssignedTasks,searchTasksAssignedToMe} from "./task.controller"
 
 export const taskRouter = Router();
 
@@ -30,4 +30,11 @@ taskRouter.get("/assigned-to-me/projects",requireTaskAuth("DEVELOPER"),getProjec
 //Search API
 taskRouter.get("/search",requireTaskAuth("ADMIN"),searchAllTasks);
 taskRouter.get("/created-by-me/search",requireTaskAuth("ADMIN", "PROJECT_MANAGER"),searchTasksCreatedByMe);
-// taskRouter.get("/assigned-to-me/search",requireTaskAuth("DEVELOPER"),searchTasksAssignedToMe);
+taskRouter.get("/assigned-to-me/search",requireTaskAuth("DEVELOPER"),searchTasksAssignedToMe);
+
+
+//Developer Task API
+taskRouter.get("/assigned-to-me/count",requireTaskAuth("DEVELOPER"),getAssignedTaskCount);
+taskRouter.get("/assigned-to-me/overdue-count",requireTaskAuth("DEVELOPER"),getAssignedOverdueTaskCount);
+taskRouter.get("/assigned-to-me/countbystatus",requireTaskAuth("DEVELOPER"),getAssignedTaskCountByStatusCount);
+taskRouter.get("/assigned-to-me/upcoming",requireTaskAuth("DEVELOPER"),getUpcomingAssignedTasks);
