@@ -2,9 +2,11 @@ import "dotenv/config";
 import { createServer } from "node:http";
 import { app } from "./app.js";
 import { pool } from "./db/pool.js";
+import { setupSocket } from "./socket/socket.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const server = createServer(app);
+app.locals.io = setupSocket(server);
 
 async function startServer() {
     try{

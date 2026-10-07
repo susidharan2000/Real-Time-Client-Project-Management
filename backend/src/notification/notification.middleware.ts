@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
-import { isAuthorized } from "./client.service";
+import { isAuthorized } from "./notification.service";
 
 export function requireClientAuth(...allowedRoles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {

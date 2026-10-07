@@ -2,7 +2,7 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
-import { isAuthorized } from "./project.service";
+import { getAuthorizedRole } from "./project.service";
 
 export function requireProjectAuth(...allowedRoles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -35,12 +35,13 @@ export function requireProjectAuth(...allowedRoles: string[]) {
     
         const userId = payload.user_id;
     
-        const authorized:Boolean = await isAuthorized(userId, allowedRoles)
+        const role = await getAuthorizedRole(userId, allowedRoles)
     
-        if (!authorized){
+        if (!role){
              return res.status(403).json({ message: "Unauthorized User" });
         }
         res.locals.userId = userId;
+        res.locals.role = role;
       } catch {
         return res.status(401).json({ message: "Invalid or expired access token" });
       }

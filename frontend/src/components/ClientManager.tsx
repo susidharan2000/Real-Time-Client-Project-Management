@@ -1,19 +1,22 @@
 import { Link } from "react-router";
 import axios from "axios";
 import { useEffect, useState } from "react";
+import type { Socket } from "socket.io-client";
 
 type ClientRowList = {
-  id: number
+  id: string
   name: string
-  email: string 
+  email: string | null
   projectCount:number
 }
 
 type ClientManagerProps = {
   accessToken: string;
+  socket:Socket | null
 };
 
-export default function ClientManager({accessToken}:ClientManagerProps) {
+export default function ClientManager({accessToken, socket}:ClientManagerProps) {
+
   const[showAddComponentUI,setShowAddComponentUI] = useState<Boolean>(false)
   const[showEditComponentUI,setshowEditComponentUI] = useState<Boolean>(false)
   const[clients,setClients] = useState<ClientRowList[]>([])
@@ -22,7 +25,7 @@ export default function ClientManager({accessToken}:ClientManagerProps) {
   const [,SetError] = useState("")
 
   //client list
-  const[clientID,setClientID] = useState<number>(0)
+  const[clientID,setClientID] = useState("")
   const[clientname,setClientName] = useState("")
   const[email,setEmail] = useState("")
 
@@ -74,13 +77,9 @@ export default function ClientManager({accessToken}:ClientManagerProps) {
       SetError("Client Name Feild is Empty")
       return 
     }
-    if (!email){
-      SetError("Client Name Feild is Empty")
-      return 
-    }
     (async()=>{
       try{
-      await axios.post(`${URL}/client`, {
+      const res = await axios.post<{ clients: ClientRowList[] }>(`${URL}/client`, {
         name: clientname,
         email: email,
       },
@@ -93,7 +92,7 @@ export default function ClientManager({accessToken}:ClientManagerProps) {
     setClientName("")
     setEmail("")
     setShowAddComponentUI(false)
-    setClientListrefresh((current) => !current)//refersh
+    setClients(res.data.clients)
 
     }catch(err){
       console.error("Failed to create clients:", err);
@@ -103,8 +102,7 @@ export default function ClientManager({accessToken}:ClientManagerProps) {
   }
 
   //Delete Company
-
-async function handleDelete(id: number) {
+async function handleDelete(id: string) {
   try {
     await axios.delete(`${URL}/client/${id}`, {
       headers: {
@@ -123,7 +121,7 @@ async function handleDelete(id: number) {
 function handleEditClient(client: ClientRowList){
   setClientID(client.id)
   setClientName(client.name)
-  setEmail(client.email)
+  setEmail(client.email ?? "")
   setShowAddComponentUI(false)
   setshowEditComponentUI(true)
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -131,7 +129,7 @@ function handleEditClient(client: ClientRowList){
 
 async function saveEditClient(){
   try{
-    await axios.put(`${URL}/${clientID}`, {
+    await axios.put(`${URL}/client/${clientID}`, {
         name: clientname,
         email: email,
       },
@@ -156,6 +154,27 @@ function clearFeild(){
   setClientName("")
     setEmail("")
 }
+
+//Live Feeds
+
+useEffect(() => {
+    if (!socket) return;
+
+    const handleClientListRender = ({ clients }: { clients: ClientRowList[] }) => {
+      setClients(clients);
+    };
+
+    socket.on("client:created", handleClientListRender);
+    socket.on("client:updated",handleClientListRender);
+    socket.on("client:deleted",handleClientListRender)
+
+    return () => {
+      socket.off("client:created", handleClientListRender);
+      socket.off("client:updated",handleClientListRender);
+      socket.off("client:deleted",handleClientListRender)
+    };
+
+  }, [socket]);
 
 
 

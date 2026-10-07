@@ -7,6 +7,7 @@ import { dashboardRouter } from "./dashboard/dashboard.router.ts"
 import {taskRouter} from "./task/task.router.ts"
 import {projectRouter} from "./project/project.router.ts"
 import {clientRouter} from "./client/client.router.ts"
+import { notificationRouter } from "./notification/notification.router.ts";
 
 export const app= express();
 
@@ -27,3 +28,4 @@ app.use("/dashboard", dashboardRouter);
 app.use("/task", taskRouter);
 app.use("/project", projectRouter);
 app.use("/client", clientRouter);
+app.use("/notification", notificationRouter);

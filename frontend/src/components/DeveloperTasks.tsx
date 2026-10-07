@@ -30,22 +30,27 @@ type DeveloperTaskProp = {
 export default function DeveloperTasks({accessToken}:DeveloperTaskProp) {
   const URL = "http://localhost:3000";
 
+  //serach Params
   const [searchParams, setSearchParams] = useSearchParams();
   const overdue = searchParams.get("overdue") === "true";
   const appliedTaskName = searchParams.get("task_name") ?? "";
   const appliedProjectId = searchParams.get("project_id") ?? "";
   const appliedStatus = searchParams.get("status") ?? "";
   const appliedPriority = searchParams.get("priority") ?? "";
+
+  //Task List State
   const [loading,setLoading] = useState(true)
   const [listError,setListError] = useState("")
   const [tasks,setTasks] = useState<Task[]>([])
   const [projects,setProjects] = useState<ProjectOption[]>([])
   const [projectsError,setProjectsError] = useState("")
+  const [taskListRefresh,setTaskListRefresh] = useState(false)
+
+  //filter States
   const [taskNameFilter,setTaskNameFilter] = useState(appliedTaskName)
   const [projectIdFilter,setProjectIdFilter] = useState(appliedProjectId)
   const [statusFilter,setStatusFilter] = useState(appliedStatus)
   const [priorityFilter,setPriorityFilter] = useState(appliedPriority)
-  const [taskListRefresh,setTaskListRefresh] = useState(false)
 
   // Keep the filter fields in sync with browser navigation.
   const filterKey = JSON.stringify([appliedTaskName,appliedProjectId,appliedStatus,appliedPriority]);

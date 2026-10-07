@@ -1,10 +1,12 @@
-import type { Request, Response} from "express";
+import type { CookieOptions, Request, Response} from "express";
 import { authenticateUser,verifyRefreshToken,RevokeRefreshToken,verifySession } from "./auth.service.ts";
 
-// Validate the request body for username and password
-//             Create the refresh token and access token
-//             store the refresh token in the database
-//             return the access token and refresh token to the client
+const refreshCookieOptions: CookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production" || process.env.FRONTEND_ORIGIN?.startsWith("https://") === true,
+    sameSite: "strict",
+};
+
 export const login = async (req: Request, res: Response) => {
         try{
             const {username, password} = req.body;
@@ -16,7 +18,7 @@ export const login = async (req: Request, res: Response) => {
             if (result === null) {
                 return res.status(401).json({message: "Invalid username or password"});
             }
-            res.cookie("refreshToken", result.refreshToken, {httpOnly: true, secure: true, sameSite: "strict"});
+            res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
             return res.status(200).json(
                 {
                     "userName": result.user.username,
@@ -58,7 +60,7 @@ export const logout = async (req: Request, res: Response) => {
         if (!isRevoked) {
             return res.status(400).json({message: "Failed to revoke refresh token"});
         }
-        res.clearCookie("refreshToken");
+        res.clearCookie("refreshToken", refreshCookieOptions);
         return res.status(200).json({message: "Logged out successfully"});
     }
     catch(err){

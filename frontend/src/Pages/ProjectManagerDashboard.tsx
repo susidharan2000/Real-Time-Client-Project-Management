@@ -1,6 +1,8 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import type { Socket } from "socket.io-client";
+
 
 
 type ProjectManagerDashboardProps = {
@@ -8,6 +10,7 @@ type ProjectManagerDashboardProps = {
   userId: string;
   accessToken: string;
   role: string;
+  socket:Socket | null;
 };
 
 
@@ -28,7 +31,7 @@ export type UpcomingDueTask = {
   status: TaskStatus;
 }
 
-function ProjectManagerDashboard({ username, accessToken }: ProjectManagerDashboardProps) {
+function ProjectManagerDashboard({ username, accessToken,socket }: ProjectManagerDashboardProps) {
 
   const URL = "http://localhost:3000/dashboard";
   //states for handling the dashboard data
@@ -90,6 +93,22 @@ function ProjectManagerDashboard({ username, accessToken }: ProjectManagerDashbo
       fetchDashboardData();
     }
   },[accessToken])
+
+
+  //live Feed
+    useEffect(()=>{
+      if(!socket)return;
+
+      const handleProjectCount = ({myProjectCount}:{myProjectCount:number})=>{
+      setManagedProjectsCount(myProjectCount)
+      }
+  
+      socket.on("project:mycount",handleProjectCount);
+
+      return ()=>{
+        socket.off("project:mycount",handleProjectCount );
+      }
+    },[socket]);
 
   return (
     <section className="min-h-[calc(100dvh-5rem)] bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-10" aria-labelledby="project-manager-dashboard-title">

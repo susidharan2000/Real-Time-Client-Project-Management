@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 import ProjectFilters from "./ProjectFilters";
+import type { Socket } from "socket.io-client";
 
 type ProjectRowList = {
   project_id: string;
@@ -30,9 +31,10 @@ type ProjectProps = {
   role:string;
   userId: string;
   userName: string;
+  socket:Socket | null;
 };
 
-export default function Project({accessToken,role,userId,userName}: ProjectProps) {
+export default function Project({accessToken,role,userId,userName,socket}: ProjectProps) {
   const [showAddComponentUI, setShowAddComponentUI] = useState(false);
   const [showEditComponentUI, setShowEditComponentUI] = useState(false);
   const [projects, setProjects] = useState<ProjectRowList[]>([]);
@@ -259,6 +261,24 @@ export default function Project({accessToken,role,userId,userName}: ProjectProps
       managerChoices.set(project.project_manager_id, project.project_manager ?? "Unknown manager");
     }
   }
+
+  useEffect(()=>{
+    if(!socket)return;
+
+     const handleProjectList = ({ projects }: { projects: ProjectRowList[] }) => {
+      console.log("Event Recived!")
+      setProjects(projects);
+    };
+
+    socket.on("project:created",handleProjectList );
+    socket.on("project:updated",handleProjectList);
+    socket.on("project:deleted",handleProjectList);
+    return ()=>{
+      socket.off("project:created",handleProjectList );
+    socket.off("project:updated",handleProjectList);
+    socket.off("project:deleted",handleProjectList);
+    }
+  },[socket]);
 
   return (
     <section className="min-h-[calc(100dvh-5rem)] bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 sm:py-8" aria-labelledby="projects-title">
