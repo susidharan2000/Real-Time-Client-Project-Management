@@ -206,7 +206,7 @@ function AdminDashboard({
       }
     }
 
-    const handleOverdueTaskCount = async(signal: AbortSignal) => {
+    const handleOverdueTaskCount = async(signal: AbortSignal):Promise<void> => {
       try {
         const { data } = await axios.get<{ totalOverDueTask: number }>(
           `${URL}/task/overduecount`,
