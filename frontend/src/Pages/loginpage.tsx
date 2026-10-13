@@ -56,6 +56,15 @@ function LoginPage({ initialSession }: LoginPageProps) {
   }
 
   async function handleLogout() {
+    setAccessToken(null);
+    setUsername("");
+    setUserId("");
+    setRole("");
+    setPassword("");
+    setError("");
+    setLoading(true);
+    navigate('/', { replace: true });
+
   try {
     await axios.post(
       `${URL}/auth/logout`,
@@ -64,14 +73,9 @@ function LoginPage({ initialSession }: LoginPageProps) {
     );
   } catch (err) {
     console.error("Logout failed:", err);
+    setError("Signed out locally, but server logout failed. Your server session may still be active.");
   } finally {
-    setUsername("");
-    setUserId("");
-    setAccessToken(null);
-    setRole("");
-    setPassword("");
-    setError("");
-    navigate('/', { replace: true });
+    setLoading(false);
   }
  }
 
