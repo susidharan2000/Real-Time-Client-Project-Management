@@ -6,6 +6,7 @@ import { addUser, removeUser, fetchOnlineUserCount } from "../presence/presence.
 
 export function setupSocket(server: HttpServer): Server {
   const io = new Server(server, {
+    transports: ["websocket"],
     cors: {
       origin: process.env.FRONTEND_ORIGIN,
       credentials: true,

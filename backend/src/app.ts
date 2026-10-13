@@ -8,6 +8,7 @@ import {taskRouter} from "./task/task.router.ts"
 import {projectRouter} from "./project/project.router.ts"
 import {clientRouter} from "./client/client.router.ts"
 import { notificationRouter } from "./notification/notification.router.ts";
+import { activityRouter } from "./activitylog/activitylog.router.ts";
 
 export const app= express();
 
@@ -29,3 +30,4 @@ app.use("/task", taskRouter);
 app.use("/project", projectRouter);
 app.use("/client", clientRouter);
 app.use("/notification", notificationRouter);
+app.use("/activity",activityRouter);

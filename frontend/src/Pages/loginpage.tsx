@@ -1,3 +1,4 @@
+import { API_URL } from "../api";
 import axios from 'axios'
 import { useState, type FormEvent} from 'react'
 import Dashboard from './dashboard'
@@ -12,7 +13,7 @@ type LoginPageProps = {
   };
 };
 
-const URL = 'http://localhost:3000';
+const URL = API_URL;
 //const URL = 'https://real-time-client-project-management-production.up.railway.app';
 
 function LoginPage({ initialSession }: LoginPageProps) {

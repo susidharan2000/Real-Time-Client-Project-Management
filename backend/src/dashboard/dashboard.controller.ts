@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { fetchCreatedTaskCountByPriority, type TaskPriorityCounts } from "../task/task.service.ts";
 import { fetchClientCount } from "../client/client.service.ts";
 import { fetchProjectCount,fetchManagedProjectCount } from "../project/project.service.ts";
 import {fetchCreatedTaskCount,fetchCreatedOverdueTaskCount, fetchCreatedTaskCountByStatus,fetchUpcomingTaskByDueDateForManager, UpcomingTask, TaskCounts, fetchAssignedTaskCount,fetchAssignedOverdueTaskCount, fetchAssignedTaskCountByStatusCount,AssignedUpcomingTask,fetchUpcomingAssignedTasks} from "../task/task.service.ts"
@@ -38,13 +39,14 @@ export async function getAdminSummary(_req: Request, res: Response){
 export async function getProjectmanagerSummary(_req: Request, res: Response){
   try{
     const userID:string = res.locals.userId;
-    const [totalManagedProjects, totalCreatedTasks,totalOverDueTasks, taskByStatus,upcomingDueTasks]:[number, number, number, TaskCounts, UpcomingTask[]] = await Promise.all(
+    const [totalManagedProjects, totalCreatedTasks,totalOverDueTasks, taskByStatus,upcomingDueTasks,taskByPriority]:[number, number, number, TaskCounts, UpcomingTask[], TaskPriorityCounts] = await Promise.all(
       [
         fetchManagedProjectCount(userID),
         fetchCreatedTaskCount(userID),
         fetchCreatedOverdueTaskCount(userID),
         fetchCreatedTaskCountByStatus(userID),
         fetchUpcomingTaskByDueDateForManager(userID),
+        fetchCreatedTaskCountByPriority(userID),
       ]
     )
     return res.status(200).json({
@@ -53,6 +55,7 @@ export async function getProjectmanagerSummary(_req: Request, res: Response){
       totalOverDueTasks,
       taskByStatus,
       upcomingDueTasks,
+      taskByPriority,
     });
   }
   catch (error) {

@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { API_URL } from "../api";
+import { useCallback, useEffect, useRef, useState } from "react";
 import NotificationPopup, { type NotificationItem } from "../components/NotificationPopup";
 import axios from "axios";
+import type { Socket } from "socket.io-client";
 
 type HeaderProps = {
   userName: string;
@@ -8,6 +10,7 @@ type HeaderProps = {
   role?: string;
   handleLogout: ()=> Promise<void>
   accessToken:string
+  socket: Socket | null
 };
 
 const roleLabels: Record<string, string> = {
@@ -24,12 +27,33 @@ type Notification = {
 }
 
 
-function Header({userName, title = "Project workspace", accessToken, role ,handleLogout}: HeaderProps) {
-  const URL = 'http://localhost:3000';
+function Header({userName, title = "Project workspace", accessToken, role ,handleLogout,socket}: HeaderProps) {
+  const URL = API_URL;
   const notificationRef = useRef<HTMLDivElement>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   const [notifications,setNotifications] = useState<Notification[]>([]);
+  const [notificationError,setNotificationError] = useState("");
+
+  const closeNotifications = useCallback(async () => {
+    if (!isNotificationOpen) return;
+    setIsNotificationOpen(false);
+    const notificationIDs = notifications
+      .filter(item => item.read_at === null)
+      .map(item => item.notification_id);
+    if (!accessToken || notificationIDs.length === 0) return;
+
+    setNotificationError("");
+    try {
+      await axios.patch(`${URL}/notification/mark-as-readed`, { notificationIDs }, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setNotifications(current => current.filter(item => !notificationIDs.includes(item.notification_id)));
+    } catch (error) {
+      console.error("Failed to mark notifications as read:", error);
+      setNotificationError("Could not mark notifications as read. Open and close the list to retry.");
+    }
+  }, [isNotificationOpen, notifications, accessToken]);
 
 
   useEffect(() => {
@@ -38,13 +62,13 @@ function Header({userName, title = "Project workspace", accessToken, role ,handl
     function closeOnOutsideClick(event: MouseEvent) {
       const container = notificationRef.current;
       if (container && event.target instanceof Node && !container.contains(event.target)) {
-        setIsNotificationOpen(false);
+        void closeNotifications();
       }
     }
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsNotificationOpen(false);
+        void closeNotifications();
       }
     }
 
@@ -54,7 +78,7 @@ function Header({userName, title = "Project workspace", accessToken, role ,handl
       document.removeEventListener("click", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isNotificationOpen]);
+  }, [isNotificationOpen, closeNotifications]);
 
   useEffect(() =>{
     if(!accessToken)return;
@@ -87,6 +111,38 @@ function Header({userName, title = "Project workspace", accessToken, role ,handl
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+
+
+  // Live feeds
+  useEffect(() => {
+    if (!socket || !accessToken) return;
+    const notificationSound = new Audio("/sounds/notification.wav");
+    notificationSound.volume = 0.5;
+
+    const refreshNotifications = async () => {
+      notificationSound.currentTime = 0;
+      void notificationSound.play().catch((error) => {
+        console.warn("Failed to play notification sound:", error);
+      });
+      try {
+        const { data } = await axios.get(`${URL}/notification`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        setNotifications(data.notification);
+      } catch (error) {
+        console.error("Failed to refresh notifications:", error);
+      }
+    };
+
+    socket.on("notification:created", refreshNotifications);
+
+    return () => {
+      socket.off("notification:created", refreshNotifications);
+      notificationSound.pause();
+      notificationSound.currentTime = 0;
+    };
+  }, [socket, accessToken]);
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white text-slate-800 shadow-sm">
@@ -121,7 +177,10 @@ function Header({userName, title = "Project workspace", accessToken, role ,handl
             type="button"
             aria-expanded={isNotificationOpen}
             aria-controls="notification-popup"
-            onClick={() => setIsNotificationOpen((open) => !open)}
+            onClick={() => {
+              if (isNotificationOpen) void closeNotifications();
+              else setIsNotificationOpen(true);
+            }}
             className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition-colors hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
           >
           <span className="relative flex size-7 shrink-0 items-center justify-center text-slate-600" aria-hidden="true">
@@ -173,6 +232,7 @@ function Header({userName, title = "Project workspace", accessToken, role ,handl
         </button>
         </div>
       </div>
+      {notificationError && <p role="alert" className="border-t border-red-100 bg-red-50 px-6 py-2 text-sm text-red-700">{notificationError}</p>}
     </header>
   );
 }

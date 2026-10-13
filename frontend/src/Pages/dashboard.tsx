@@ -1,3 +1,4 @@
+import { API_URL } from "../api";
 import AdminDashboard from "./AdminDashboard";
 import ProjectManagerDashboard from "./ProjectManagerDashboard";
 import DeveloperDashboard from "./DeveloperDashboard";
@@ -19,7 +20,7 @@ type DashboardProps = {
 };
 
 function Dashboard({ userName, userId, role, accessToken, handleLogout }: DashboardProps) {
-  const URL = 'http://localhost:3000';
+  const URL = API_URL;
 
   const [socket,setSocket] = useState<Socket|null>(null);
   const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
@@ -28,6 +29,7 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout }: Dashbo
     if (!accessToken) return;
 
     const connection = io(URL,{
+      transports: ["websocket"],
       auth:{token: accessToken},
       autoConnect: false,
     });
@@ -61,7 +63,7 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout }: Dashbo
 
   return (
     <>
-      <Header userName={userName} role={role} handleLogout={handleLogout} accessToken={accessToken}/>
+      <Header userName={userName} role={role} handleLogout={handleLogout} accessToken={accessToken} socket={socket}/>
       <main>
         <Routes>
           <Route path="/" element={role === "ADMIN" ? (
@@ -69,7 +71,7 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout }: Dashbo
           ) : role === "PROJECT_MANAGER" ? (
             <ProjectManagerDashboard username={userName} userId={userId} accessToken={accessToken} role={role} socket={socket}/>
           ) : role === "DEVELOPER" ? (
-            <DeveloperDashboard username={userName} userId={userId} accessToken={accessToken} role={role} />
+            <DeveloperDashboard username={userName} userId={userId} accessToken={accessToken} role={role} socket={socket} />
           ) : (
             <p>Invalid role</p>
           )} />
@@ -77,11 +79,11 @@ function Dashboard({ userName, userId, role, accessToken, handleLogout }: Dashbo
           {(role === "ADMIN" || role === "PROJECT_MANAGER") && <>
             <Route path="/clients" element={<ClientManager accessToken={accessToken} socket={socket} />} />
             <Route path="/projects" element={<Project accessToken={accessToken} role={role} userId={userId} userName = {userName} socket={socket} />} />
-            <Route path="/tasks" element={<Task accessToken={accessToken} role={role} />} />
+            <Route path="/tasks" element={<Task accessToken={accessToken} role={role} socket={socket} />} />
           </>}
 
           {(role === "DEVELOPER") && <>
-              <Route path="/DeveloperTasks" element={<DeveloperTasks accessToken={accessToken }/>} />
+              <Route path="/DeveloperTasks" element={<DeveloperTasks accessToken={accessToken} socket={socket} />} />
               <Route path="/tasks" element={<Navigate to="/DeveloperTasks" replace />} />
           </>}
           <Route path="*" element={<Navigate to="/" replace />} />

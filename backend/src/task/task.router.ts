@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { requireTaskAuth } from "./task.middleware";
+import { getCreatedTaskCountByPriority } from "./task.controller";
+import { startTask, submitTaskForReview } from "./task.controller";
+import { requireTaskAuth, requireTaskEditAccess } from "./task.middleware";
 import { getTaskCount,getAllOverDueTaskCount,getTaskCountByStatus,getAllTask,getTaskAssignees,addTask,editTask,deleteTask,getProjectWithAtleastOneTask,getProjectsWithTasksCreatedByMe,getProjectsWithTasksAssignedToMe,searchAllTasks,getMyTasksCount,getCreatedOverdueTaskCount,getCreatedTaskCountByStatus,getUpcomingTaskByDueDateCreatedByMe, searchTasksCreatedByMe,getAssignedTaskCount,getAssignedOverdueTaskCount,getAssignedTaskCountByStatusCount,getUpcomingAssignedTasks,searchTasksAssignedToMe} from "./task.controller"
 
 export const taskRouter = Router();
@@ -11,6 +13,7 @@ taskRouter.get("/countbystatus", requireTaskAuth("ADMIN"),getTaskCountByStatus);
 taskRouter.get("/my-taskcount", requireTaskAuth("ADMIN", "PROJECT_MANAGER", "DEVELOPER"),getMyTasksCount);
 taskRouter.get("/my-Created-me/overdue-count", requireTaskAuth("ADMIN", "PROJECT_MANAGER"),getCreatedOverdueTaskCount);
 taskRouter.get("/my-Created-me/countbystatus", requireTaskAuth("ADMIN", "PROJECT_MANAGER"),getCreatedTaskCountByStatus);
+taskRouter.get("/my-Created-me/countbypriority", requireTaskAuth("ADMIN", "PROJECT_MANAGER"),getCreatedTaskCountByPriority);
 taskRouter.get("/my-Created-me/upcoming-due-tasks", requireTaskAuth("ADMIN", "PROJECT_MANAGER"),getUpcomingTaskByDueDateCreatedByMe);
 
 
@@ -19,7 +22,7 @@ taskRouter.get("/my-Created-me/upcoming-due-tasks", requireTaskAuth("ADMIN", "PR
 taskRouter.get("/", requireTaskAuth("ADMIN"),getAllTask);
 taskRouter.get("/assignees", requireTaskAuth("ADMIN","PROJECT_MANAGER"),getTaskAssignees);
 taskRouter.post("/", requireTaskAuth("ADMIN","PROJECT_MANAGER"),addTask);
-taskRouter.put("/:id", requireTaskAuth("ADMIN","PROJECT_MANAGER"),editTask);
+taskRouter.put("/:id", requireTaskAuth("ADMIN","PROJECT_MANAGER"),requireTaskEditAccess,editTask);
 taskRouter.delete("/:id", requireTaskAuth("ADMIN","PROJECT_MANAGER"),deleteTask);
 
 // get PROJECT BY TASK
@@ -34,6 +37,9 @@ taskRouter.get("/assigned-to-me/search",requireTaskAuth("DEVELOPER"),searchTasks
 
 
 //Developer Task API
+taskRouter.patch("/:id/start", requireTaskAuth("DEVELOPER"), startTask);
+taskRouter.patch("/:id/submit-review", requireTaskAuth("DEVELOPER"), submitTaskForReview);
+
 taskRouter.get("/assigned-to-me/count",requireTaskAuth("DEVELOPER"),getAssignedTaskCount);
 taskRouter.get("/assigned-to-me/overdue-count",requireTaskAuth("DEVELOPER"),getAssignedOverdueTaskCount);
 taskRouter.get("/assigned-to-me/countbystatus",requireTaskAuth("DEVELOPER"),getAssignedTaskCountByStatusCount);

@@ -1,3 +1,4 @@
+import { API_URL } from "./api";
 import { useEffect, useState } from 'react'
 import './index.css'
 import Login from './Pages/loginpage'
@@ -11,7 +12,7 @@ function App() {
 
   useEffect(()=>{
     try{
-      const URL = 'http://localhost:3000';
+      const URL = API_URL;
       //const URL = 'https://real-time-client-project-management-production.up.railway.app';
 
       axios.post(`${URL}/auth/checksession`,{}, {withCredentials:true})

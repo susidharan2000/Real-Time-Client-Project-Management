@@ -1,12 +1,16 @@
+import { API_URL } from "../api";
+import ActivityFeed from "../components/ActivityFeed";
 import axios from "axios";
 import { useEffect,useState } from "react";
 import { Link } from "react-router";
+import type { Socket } from "socket.io-client";
 
 type DeveloperDashboardProps = {
   username: string;
   userId: string;
   role: string;
   accessToken: string;
+  socket: Socket | null;
 };
 
 
@@ -33,8 +37,8 @@ type UpcomingDueTask = {
   is_overdue: boolean;
 };
 
-function DeveloperDashboard({ username, accessToken }: DeveloperDashboardProps) {
-  const URL = "http://localhost:3000";
+function DeveloperDashboard({ username, accessToken, socket }: DeveloperDashboardProps) {
+  const URL = API_URL;
   //Developer Dashboard Summary
   const [totalTasksAssignedToMe,setTotalTasksAssignedToMe] = useState<number>(0)
   const [totalOverdueTasksAssignedToMe,setTotalOverdueTasksAssignedToMe] = useState<number>(0)
@@ -45,6 +49,7 @@ function DeveloperDashboard({ username, accessToken }: DeveloperDashboardProps) 
       done: 0
     });
   const [upcomingDueTasks, setUpcomingDueTasks] = useState<UpcomingDueTask[]>([]);
+  const [taskSummaryRefresh, setTaskSummaryRefresh] = useState(0);
 
   //loading State
 
@@ -53,30 +58,52 @@ function DeveloperDashboard({ username, accessToken }: DeveloperDashboardProps) 
 
 
   useEffect(() =>{
+    const controller = new AbortController();
     async function fetchDeveloperDashboardData() {
       try {
         const response = await axios.get(`${URL}/dashboard/developer/summary`, {
+          signal: controller.signal,
           headers: {
             "Authorization": `Bearer ${accessToken}`,
           },
         });
         //console.log(response.data)
 
+        if (controller.signal.aborted) return;
         setTotalTasksAssignedToMe(response.data.totalTasksAssignedToMe)
         setTotalOverdueTasksAssignedToMe(response.data.totalOverdueTasksAssignedToMe)
         setTaskStatusCounts(response.data.totalTaskCountByStatus)
         setUpcomingDueTasks(response.data.AssignedUpcomingTasks)
 
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error("Failed to fetch developer dashboard data:", error);
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
     if(accessToken){
       fetchDeveloperDashboardData();
     }
-  },[accessToken]);
+    return () => controller.abort();
+  },[accessToken, taskSummaryRefresh]);
+
+  //Live task updates
+  useEffect(() => {
+    if (!socket || !accessToken) return;
+    const refreshTaskSummary = () => {
+      console.log("Event recived");
+      setTaskSummaryRefresh(current => current + 1);
+    };
+    socket.on("task:assigned", refreshTaskSummary);
+    socket.on("task:removed", refreshTaskSummary);
+    socket.on("task:updated", refreshTaskSummary);
+    return () => {
+      socket.off("task:assigned", refreshTaskSummary);
+      socket.off("task:removed", refreshTaskSummary);
+      socket.off("task:updated", refreshTaskSummary);
+    };
+  }, [socket, accessToken]);
 
   const overviewCards = [
   { label: "Assigned tasks",data:totalTasksAssignedToMe, description: "Work on your list", color: "bg-blue-50 text-blue-700", icon: "M9 4H5v17h14V4h-4M9 2h6v4H9ZM9 11h6M9 15h6", href: "/DeveloperTasks", action: "View tasks" },
@@ -86,7 +113,7 @@ const taskStatuses = [
   { label: "To do",data:taskStatusCounts.todo, dot: "bg-slate-400", badge: "bg-slate-100 text-slate-700" },
   { label: "In progress",data:taskStatusCounts.inprocess, dot: "bg-blue-500", badge: "bg-blue-50 text-blue-700" },
   { label: "In review",data:taskStatusCounts.in_review, dot: "bg-amber-400", badge: "bg-amber-50 text-amber-800" },
-  { label: "Done",data:taskStatusCounts.todo,dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700" },
+  { label: "Done",data:taskStatusCounts.done,dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700" },
 ];
   return (
     <section className="min-h-[calc(100dvh-5rem)] bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-10" aria-labelledby="developer-dashboard-title">
@@ -142,8 +169,8 @@ const taskStatuses = [
             ) : upcomingDueTasks.length === 0 ? (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="developer-deadlines-title">
             <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-              <h2 id="developer-deadlines-title" className="text-lg font-semibold">Upcoming deadlines</h2>
-              <p className="mt-1 text-sm text-slate-500">Know what needs to be done next.</p>
+              <h2 id="developer-deadlines-title" className="text-lg font-semibold">Assigned tasks</h2>
+              <p className="mt-1 text-sm text-slate-500">Ordered by priority, then due date.</p>
             </div>
             <div className="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center">
               <span className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700" aria-hidden="true">
@@ -157,8 +184,8 @@ const taskStatuses = [
             (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="developer-deadlines-title">
                 <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-                  <h2 id="developer-deadlines-title" className="text-lg font-semibold">Upcoming deadlines</h2>
-                  <p className="mt-1 text-sm text-slate-500">Know what needs to be done next.</p>
+                  <h2 id="developer-deadlines-title" className="text-lg font-semibold">Assigned tasks</h2>
+                  <p className="mt-1 text-sm text-slate-500">Ordered by priority, then due date.</p>
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {upcomingDueTasks.map((task) => (
@@ -179,6 +206,7 @@ const taskStatuses = [
             )
           }
         </div>
+        <ActivityFeed accessToken={accessToken} socket={socket} role="DEVELOPER" />
       </div>
     </section>
   );

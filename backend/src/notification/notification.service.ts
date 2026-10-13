@@ -37,3 +37,16 @@ export async function fetchMyNotifications(userID: string): Promise<Notification
 
   return res.rows;
 }
+
+export async function markNotificationAsReaded(userID: string, notificationIDs: string[],): Promise<number> {
+  const res = await pool.query(
+    `UPDATE notifications
+     SET read_at = NOW()
+     WHERE recipient_user_id = $1
+       AND notification_id = ANY($2::bigint[])
+       AND read_at IS NULL;`,
+    [userID, notificationIDs],
+  );
+
+  return res.rowCount ?? 0;
+}

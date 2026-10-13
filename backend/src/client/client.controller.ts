@@ -42,13 +42,16 @@ export const addClient = async (req: Request, res: Response) => {
     }
 
     const client = await insertClient(userID,name.trim(), clientEmail);
-    const clients: Client[] = await fetchClients();
-    const clientCount = await fetchClientCount()
     //send the Event to Admin
-    io.to("admins").emit("client:count", { clientCount });
-    io.to("admins").emit("client:created", { clients });
+    try{
+      io.to("admins").emit("client:created");
+      io.to("admins").emit("notification:created");
+    }
+    catch(error){
+       console.error("Client Created, but live update failed:", error);
+    }
 
-    return res.status(201).json({ client, clients });
+    return res.status(201).json({ client});
     
   } catch (error) {
     console.error("Failed to add client:", error);
@@ -81,11 +84,13 @@ export const editClient = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Client not found" });
     }
 
-    const clients:Client[] = await fetchClients();
-
     //send the Event to Admin
-    io.to("admins").emit("client:updated", { clients });
-
+    try{
+        io.to("admins").emit("client:updated");
+        io.to("admins").emit("notification:created");
+    }catch(error){
+      console.error("Client updated, but live update failed:", error);
+    }
 
     return res.status(200).json({ client });
   } catch (error) {
@@ -107,11 +112,14 @@ export const deleteClient = async (req: Request, res: Response) => {
     if (!deleted) {
       return res.status(404).json({ message: "Client not found" });
     }
-    const clients:Client[] = await fetchClients();
-    const clientCount = await fetchClientCount()
+
     //send the Event to Admin
-    io.to("admins").emit("client:deleted", { clients });
-    io.to("admins").emit("client:count", { clientCount });
+    try{
+      io.to("admins").emit("client:deleted");
+      io.to("admins").emit("notification:created");
+    }catch(error){
+      console.error("Client Deleted, but live update failed:", error);
+    }
 
     return res.status(200).json({ message: "Client deleted successfully" });
   } catch (error) {

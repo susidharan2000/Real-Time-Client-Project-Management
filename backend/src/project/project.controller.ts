@@ -58,6 +58,7 @@ export async function addProject(req: Request, res: Response){
 
         const role = res.locals.role
         const userId = res.locals.userId 
+        const userName:string = res.locals.userName
 
 
         if (typeof title !== "string" || !title.trim()) {
@@ -65,6 +66,9 @@ export async function addProject(req: Request, res: Response){
         }
         if (description != null && typeof description !== "string") {
             return res.status(400).json({ message: "Invalid project description" });
+        }
+        if (!isProjectId(client_id) || (project_manager_id != null && project_manager_id !== "" && !isProjectId(project_manager_id))) {
+            return res.status(400).json({ message: "Invalid client or project manager ID" });
         }
         const managerID: string|null = project_manager_id == null || project_manager_id === "" ? null : project_manager_id;
         if (managerID !== null) {
@@ -78,23 +82,20 @@ export async function addProject(req: Request, res: Response){
         }
 
         const createdBy = res.locals.userId;
-        const project = await insertProject(userId,title.trim(), description?.trim() || null, String(client_id), String(createdBy), managerID === null ? null : managerID);
-
-        const totalProject:number = await fetchProjectCount()
-        const projects = await fetchAllProject()
-        //emit Event 
-        //admin
-        io.to("admins").emit("project:count",{totalProject});
-        io.to("admins").emit("project:created",{projects});
-        //project Manager
-        if (managerID){
-            const myProjectCount:number = await fetchManagedProjectCount(managerID);
-            //console.log("My Project Count",myProjectCount);
-            const projects:Project[] = await fetchMyProjects(managerID);
-            io.to(`user:${managerID}`).emit("project:mycount",{myProjectCount});
-            io.to(`user:${managerID}`).emit("project:assigned",{projects});
+        const project = await insertProject(userId,userName,title.trim(), description?.trim() || null, String(client_id), String(createdBy), managerID === null ? null : managerID);
+        
+        try {
+          //Admin
+          io.to("admins").emit("project:created");
+          io.to("admins").emit("notification:created");
+          //project Manager
+          if (project.created_by) {
+            io.to(`user:${project.created_by}`).emit("project:created");
+            io.to(`user:${project.created_by}`).emit("notification:created");
+          }
+        } catch (error) {
+          console.error("Project created, but live feed failed:", error);
         }
-
         return res.status(201).json({ project });
 
     }catch(err){
@@ -115,12 +116,16 @@ export async function editProject(req: Request, res: Response) {
     const io = req.app.locals.io as Server;
     const userId:string = res.locals.userId 
     const role:string = res.locals.role;
+    const userName:string = res.locals.userName
 
     if (typeof title !== "string" || !title.trim()) {
       return res.status(400).json({ message: "Project title is required" });
     }
     if (description != null && typeof description !== "string") {
       return res.status(400).json({ message: "Invalid project description" });
+    }
+    if (!isProjectId(id) || !isProjectId(client_id) || (project_manager_id != null && project_manager_id !== "" && !isProjectId(project_manager_id))) {
+      return res.status(400).json({ message: "Invalid project, client or manager ID" });
     }
     const managerId: string | null =
       project_manager_id == null || project_manager_id === ""
@@ -142,39 +147,22 @@ export async function editProject(req: Request, res: Response) {
       });
     }
 
-    const updateResult:UpdateProjectResult|null = await updateProject(userId,String(id),title.trim(),description?.trim() || null,String(client_id),managerId === null ? null : String(managerId),String(userId));
+    const updateResult:UpdateProjectResult|null = await updateProject(userId,userName,String(id),title.trim(),description?.trim() || null,String(client_id),managerId === null ? null : String(managerId),String(userId));
     if (!updateResult) {
       return res.status(404).json({
         message: "Project not found or you do not have permission to edit it",
       });
     }
-    //Emit event
-    const projects: Project[] = await fetchAllProject();
-    //Admin
-    io.to("admins").emit("project:updated", { projects });
-    //ProjectManager
-    if (managerId) {
-      const managerProjects:Project[]= await fetchMyProjects(managerId);
-      io.to(`user:${managerId}`).emit("project:updated", {
-        projects: managerProjects,
-      });
-      //sent send the Project count
-      const myProjectCount:number = await fetchManagedProjectCount(managerId);
-      io.to(`user:${managerId}`).emit("project:mycount",{myProjectCount});
 
-    }
-    if (updateResult.previousProjectManagerID && updateResult.previousProjectManagerID !== updateResult.project.project_manager_id) {
-        //sent send the Project List
-        const projects:Project[] = await fetchMyProjects(updateResult.previousProjectManagerID)
-      io.to(`user:${updateResult.previousProjectManagerID}`).emit("project:updated", {
-        projects,
-      });
-
-      //sent send the Project count
-      const myProjectCount:number = await fetchManagedProjectCount(updateResult.previousProjectManagerID);
-      io.to(`user:${updateResult.previousProjectManagerID}`).emit("project:mycount",{myProjectCount});
-
-      //Send Notification
+    try {
+      //Emit event
+      //Admin
+      io.to("admins").emit("project:updated");
+      io.to("admins").emit("notification:created");
+      io.to(`user:${updateResult.project.created_by}`).emit("project:updated");
+      io.to(`user:${updateResult.project.created_by}`).emit("notification:created");
+    } catch (error) {
+      console.error("Project updated, but live feed failed:", error);
     }
 
     return res.status(200).json({ project: updateResult.project });
@@ -193,36 +181,36 @@ export async function editProject(req: Request, res: Response) {
 export async function deleteProject(req: Request, res: Response) {
   try {
     const id = req.params.id;
-    if (typeof id !== "string") {
+    if (typeof id !== "string" || !isProjectId(id)) {
       return res.status(400).json({ message: "Invalid project ID" });
     }
     const project_id: string = id;
 
     const io = req.app.locals.io as Server;
     const userId:string = res.locals.userId;
-    const role:string = res.locals.role;
+    const userName:string = res.locals.userName
 
-    const deletedProject:deletedResponse | null = await removeProject(project_id, userId);
+    const deletedProject:deletedResponse | null = await removeProject(project_id, userId,userName);
     if ( !deletedProject ||  !deletedProject.project) {
       return res
         .status(404)
         .json({ message: "Project not found or you are not its creator" });
     }
-    //emit Event 
+
+    try{
+    //Emit Event 
     //admin
-    const totalProject:number = await fetchProjectCount()
-    const projects: Project[] = await fetchAllProject();
+    io.to("admins").emit("project:deleted");
+    io.to("admins").emit("notification:created");
+    //project Manager
+    const projectManagerID = deletedProject.project.created_by;
+    io.to(`user:${projectManagerID}`).emit("project:deleted");
+    io.to(`user:${projectManagerID}`).emit("notification:created");
 
-    io.to("admins").emit("project:deleted", { projects });
-    io.to("admins").emit("project:count",{totalProject});
-    //Project Manager
-    if(deletedProject.project.project_manager_id){
-        const managerProjects:Project[]= await fetchMyProjects(deletedProject.project.project_manager_id); 
-        const myProjectCount:number = await fetchManagedProjectCount(deletedProject.project.project_manager_id);
-
-        io.to(`user:${deletedProject.project.project_manager_id}`).emit("project:mycount",{myProjectCount});
-        io.to(`user:${deletedProject.project.project_manager_id}`).emit("project:deleted", { projects:managerProjects })
+    }catch(error){
+        console.error("Project deleted, but live feed failed:", error);
     }
+
     return res.status(200).json({ message: "Project deleted successfully" });
   } catch (err) {
     if (err instanceof Error && "code" in err && err.code === "23503") {
@@ -233,4 +221,9 @@ export async function deleteProject(req: Request, res: Response) {
     console.error("Failed to delete project:", err);
     return res.status(500).json({ message: "Could not delete project" });
   }
+}
+
+function isProjectId(value: unknown): boolean {
+  if (typeof value === "number") return Number.isSafeInteger(value) && value > 0;
+  return typeof value === "string" && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 }

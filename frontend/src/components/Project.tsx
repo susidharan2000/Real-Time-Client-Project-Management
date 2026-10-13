@@ -1,3 +1,4 @@
+import { API_URL } from "../api";
 import { Link } from "react-router";
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
@@ -45,7 +46,7 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
   const [description, setDescription] = useState("");
   const [clientID, setClientID] = useState("");
   const [managerID, setManagerID] = useState("");
-  const [projectListRefresh, setProjectListRefresh] = useState(false);
+  const [projectListRefresh, setProjectListRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -59,7 +60,7 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
   const [clientFilter, setClientFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
 
-  const URL = "http://localhost:3000";
+  const URL = API_URL;
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -165,7 +166,7 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
       });
       clearFields();
       setShowAddComponentUI(false);
-      setProjectListRefresh((current) => !current);
+      setProjectListRefresh((current) => current+1);
     } catch (err) {
       console.error("Failed to create project:", err);
       setError(axios.isAxiosError<{message: string}>(err) ? err.response?.data?.message ?? "Could not create project" : "Could not create project");
@@ -206,7 +207,7 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
       });
       clearFields();
       setShowEditComponentUI(false);
-      setProjectListRefresh((current) => !current);
+      setProjectListRefresh((current) => current + 1);
     } catch (err) {
       console.error("Failed to update project:", err);
       setError(axios.isAxiosError<{message: string}>(err) ? err.response?.data?.message ?? "Could not update project" : "Could not update project");
@@ -227,7 +228,7 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
         clearFields();
         setShowEditComponentUI(false);
       }
-      setProjectListRefresh((current) => !current);
+      setProjectListRefresh((current) => current+1);
     } catch (err) {
       console.error("Failed to delete project:", err);
       setError(axios.isAxiosError<{message: string}>(err) ? err.response?.data?.message ?? "Could not delete project" : "Could not delete project");
@@ -265,9 +266,9 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
   useEffect(()=>{
     if(!socket)return;
 
-     const handleProjectList = ({ projects }: { projects: ProjectRowList[] }) => {
+     const handleProjectList = () => {
       console.log("Event Recived!")
-      setProjects(projects);
+      setProjectListRefresh((current) => current+1);
     };
 
     socket.on("project:created",handleProjectList );
@@ -392,7 +393,7 @@ export default function Project({accessToken,role,userId,userName,socket}: Proje
               <tbody className="divide-y divide-slate-100">
                 {loading ? <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500"><span role="status">Loading projects…</span></td></tr> : listError ? <tr><td colSpan={5} className="px-6 py-12 text-center">
                   <p role="alert" className="text-red-700">{listError}</p>
-                  <button type="button" onClick={() => setProjectListRefresh((current) => !current)} className="mt-3 min-h-11 rounded-xl px-4 py-2 font-semibold text-emerald-800 hover:cursor-pointer hover:bg-emerald-50">Try again</button>
+                  <button type="button" onClick={() => setProjectListRefresh((current) => current+1)} className="mt-3 min-h-11 rounded-xl px-4 py-2 font-semibold text-emerald-800 hover:cursor-pointer hover:bg-emerald-50">Try again</button>
                 </td></tr> : filteredProjects.length > 0 ? filteredProjects.map((project) => (
                 <tr key={project.project_id} className="transition-colors hover:bg-emerald-50/40">
                   <th scope="row" className="px-6 py-5 font-semibold text-slate-900">

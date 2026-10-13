@@ -1,6 +1,8 @@
+import { API_URL } from "../api";
 import { Link, useSearchParams } from "react-router";
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
 
 type Status = 'TO_DO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -23,7 +25,7 @@ type TaskRowList = {
 
 type ProjectOption = { project_id: string; title: string };
 type AssigneeOption = { id: string; name: string };
-type TaskProps = { accessToken: string; role:string; };
+type TaskProps = { accessToken: string; role:string; socket: Socket | null; };
 
 const statusLabels: Record<Status, string> = {
   TO_DO: "To do", IN_PROGRESS: "In progress", IN_REVIEW: "In review", DONE: "Done",
@@ -50,8 +52,13 @@ function errorMessage(err: unknown) {
     : "Something went wrong. Please try again.";
 }
 
-export default function Task({accessToken,role}: TaskProps) {
+export default function Task({accessToken,role,socket}: TaskProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const appliedDueFrom = searchParams.get("due_from") ?? "";
+  const appliedDueTo = searchParams.get("due_to") ?? "";
+  const [dueFromFilter,setDueFromFilter] = useState(appliedDueFrom);
+  const [dueToFilter,setDueToFilter] = useState(appliedDueTo);
+  const [dateFilterError,setDateFilterError] = useState("");
   const appliedTaskName = searchParams.get("task_name") ?? "";
   const appliedProjectId = searchParams.get("project_id") || "all";
   const requestedStatus = searchParams.get("status") ?? "all";
@@ -69,7 +76,7 @@ export default function Task({accessToken,role}: TaskProps) {
   const [status, setStatus] = useState<Status>("TO_DO");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
   const [dueDate, setDueDate] = useState("");
-  const [taskListRefresh, setTaskListRefresh] = useState(false);
+  const [taskListRefresh, setTaskListRefresh] = useState(0);
   const [optionsRefresh, setOptionsRefresh] = useState(false);
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -87,10 +94,11 @@ export default function Task({accessToken,role}: TaskProps) {
   const [priorityFilter,SetPriorityFilter] = useState(appliedPriority)
   const [projectListFilter,SetProjectListfilter] = useState<{project_id: string; project_title: string}[]>([])
 
-   const URL = "http://localhost:3000";
+   const URL = API_URL;
 
 //set the FilterFeild
   useEffect(()=>{
+    const controller = new AbortController();
     async function fetchProjectListForFilter(){
       if (!accessToken) return;
       try{
@@ -110,43 +118,76 @@ export default function Task({accessToken,role}: TaskProps) {
         }
         const res = await axios.get<{projects: Projects[]}>(`${URL}${endpoint}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
+          signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         SetProjectListfilter(res.data.projects);
 
       }catch(error){
+        if (controller.signal.aborted) return;
         console.error("Failed to fetch projects for filter:", error);
       }
   }
   fetchProjectListForFilter()
-  },[role, accessToken])
+  return () => controller.abort();
+  },[role, accessToken, taskListRefresh])
+
+  //Live task updates keep the currently applied filters.
+  useEffect(() => {
+    if (!socket || !accessToken) return;
+    const refreshTaskList = () => {
+      setTaskListRefresh(current => current + 1);
+    };
+    socket.on("task:created", refreshTaskList);
+    socket.on("task:deleted", refreshTaskList);
+    socket.on("task:updated", refreshTaskList);
+    return () => {
+      socket.off("task:created", refreshTaskList);
+      socket.off("task:deleted", refreshTaskList);
+      socket.off("task:updated", refreshTaskList);
+    };
+  }, [socket, accessToken]);
 
 
   //handle the Filter
   function handleFilter(){
+    if (dueFromFilter && dueToFilter && dueFromFilter > dueToFilter) {
+      setDateFilterError("Due from must be on or before Due to.");
+      return;
+    }
+    setDateFilterError("");
     const params = new URLSearchParams();
+    if (dueFromFilter) params.set("due_from", dueFromFilter);
+    if (dueToFilter) params.set("due_to", dueToFilter);
     if (taskNameFilter.trim()) params.set("task_name", taskNameFilter.trim());
     if (projectIDFiter !== "all") params.set("project_id", projectIDFiter);
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (priorityFilter !== "all") params.set("priority", priorityFilter);
     setSearchParams(params);
-    setTaskListRefresh((current) => !current);
+    setTaskListRefresh((current) => current + 1);
   }
 
   //handle Clear Filter
   async function handleClearFilter(){
+    setDueFromFilter("");
+    setDueToFilter("");
+    setDateFilterError("");
     SetTaskNameFilter("")
     SetProjectIDFilter("all")
     SetStatusFilter("all")
     SetPriorityFilter("all")
     setSearchParams({});
-    setTaskListRefresh((current) => !current)
+    setTaskListRefresh((current) => current + 1)
   }
 
   // Reset the draft fields when navigation changes the applied filters.
-  const filterKey = JSON.stringify([appliedTaskName, appliedProjectId, appliedStatus, appliedPriority]);
+  const filterKey = JSON.stringify([appliedTaskName, appliedProjectId, appliedStatus, appliedPriority, appliedDueFrom, appliedDueTo]);
   const [previousFilterKey, setPreviousFilterKey] = useState(filterKey);
   if (previousFilterKey !== filterKey) {
     setPreviousFilterKey(filterKey);
+    setDueFromFilter(appliedDueFrom);
+    setDueToFilter(appliedDueTo);
+    setDateFilterError("");
     SetTaskNameFilter(appliedTaskName);
     SetProjectIDFilter(appliedProjectId);
     SetStatusFilter(appliedStatus);
@@ -165,13 +206,20 @@ export default function Task({accessToken,role}: TaskProps) {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: controller.signal,
           params: {
+            due_from: appliedDueFrom || undefined,
+            due_to: appliedDueTo || undefined,
             task_name: appliedTaskName || undefined,
             project_id: appliedProjectId === "all" ? undefined : appliedProjectId,
             status: appliedStatus === "all" ? undefined : appliedStatus,
             priority: appliedPriority === "all" ? undefined : appliedPriority,
           },
         });
-        if (!controller.signal.aborted) setTasks(res.data.tasks);
+        if (!controller.signal.aborted) {
+          setTasks(res.data.tasks);
+          setSelectedTask(current => current
+            ? res.data.tasks.find(task => task.task_id === current.task_id) ?? null
+            : null);
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error("Failed to fetch tasks:", err);
@@ -182,7 +230,7 @@ export default function Task({accessToken,role}: TaskProps) {
     }
     if (accessToken) fetchTasks();
     return () => controller.abort();
-  }, [accessToken, taskListRefresh, appliedTaskName, appliedProjectId, appliedStatus, appliedPriority]);
+  }, [accessToken, role, taskListRefresh, appliedTaskName, appliedProjectId, appliedStatus, appliedPriority, appliedDueFrom, appliedDueTo]);
 
 
   //Fetch option for the Add Feild
@@ -298,7 +346,7 @@ export default function Task({accessToken,role}: TaskProps) {
       }
       clearFields();
       setshowAddTaskUI(false);
-      setTaskListRefresh((current) => !current);
+      setTaskListRefresh((current) => current + 1);
     } catch (err) {
       console.error("Failed to save task:", err);
       setError(errorMessage(err));
@@ -308,7 +356,7 @@ export default function Task({accessToken,role}: TaskProps) {
   }
 
   async function handleDelete(task: TaskRowList) {
-    if (saving || !window.confirm(`Delete "${task.title}"? Its activity history will also be deleted.`)) return;
+    if (saving || !window.confirm(`Delete "${task.title}"? Its activity history will be kept.`)) return;
     setSaving(true);
     setError("");
     try {
@@ -319,7 +367,7 @@ export default function Task({accessToken,role}: TaskProps) {
         clearFields();
         setshowAddTaskUI(false);
       }
-      setTaskListRefresh((current) => !current);
+      setTaskListRefresh((current) => current + 1);
     } catch (err) {
       console.error("Failed to delete task:", err);
       setError(errorMessage(err));
@@ -380,7 +428,7 @@ export default function Task({accessToken,role}: TaskProps) {
             </label>
             <div className="grid gap-5 sm:grid-cols-2">
               <label htmlFor="task-project" className="text-sm font-medium text-slate-700">Project
-                <select id="task-project" disabled={optionsLoading || !!optionsError} value={projectId} onChange={(event) => setProjectId(event.target.value)} name="project_id" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 focus:border-emerald-600">
+                <select id="task-project" disabled={!!taskID || optionsLoading || !!optionsError} value={projectId} onChange={(event) => setProjectId(event.target.value)} name="project_id" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 focus:border-emerald-600">
                   <option value="">Select a project</option>
                   {projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.title}</option>)}
                 </select>
@@ -430,7 +478,7 @@ export default function Task({accessToken,role}: TaskProps) {
             <h2 className="text-base font-semibold">Task directory</h2>
             <p className="text-xs text-slate-500">Assignments, priorities &amp; deadlines</p>
           </div>
-          <div className="grid gap-4 border-b border-slate-200 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] xl:items-end">
+          <div className="grid gap-4 border-b border-slate-200 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-4 xl:items-end">
             <label htmlFor="task-search" className="text-sm font-medium text-slate-600">Search tasks
               <input id="task-search" name="search" type="search" placeholder="Search by task name…" className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm placeholder:text-slate-400 focus:border-emerald-600" value={taskNameFilter} onChange={(event)=>SetTaskNameFilter(event.target.value)} />
             </label>
@@ -462,12 +510,19 @@ export default function Task({accessToken,role}: TaskProps) {
                 <option value="CRITICAL">Critical</option>
               </select>
             </label>
-            <div className="flex items-center gap-2 self-end">
+            <label htmlFor="task-due-from-filter" className="text-sm font-medium text-slate-600">Due from (UTC)
+              <input id="task-due-from-filter" type="date" value={dueFromFilter} max={dueToFilter || undefined} onChange={(event) => { setDueFromFilter(event.target.value); setDateFilterError(""); }} className="mt-2 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600" />
+            </label>
+            <label htmlFor="task-due-to-filter" className="text-sm font-medium text-slate-600">Due to (UTC)
+              <input id="task-due-to-filter" type="date" value={dueToFilter} min={dueFromFilter || undefined} onChange={(event) => { setDueToFilter(event.target.value); setDateFilterError(""); }} className="mt-2 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-emerald-600" />
+            </label>
+            <div className="flex items-center gap-2 self-end xl:col-span-2 xl:justify-end">
               <button type="button" onClick={handleFilter} className="min-h-11 rounded-xl bg-emerald-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:cursor-pointer hover:bg-emerald-700">Search</button>
               <button type="button" onClick={handleClearFilter} className="min-h-11 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:cursor-pointer hover:bg-slate-100" >Clear filters</button>
             </div>
           </div>
 
+          {dateFilterError && <p role="alert" className="px-6 py-3 text-sm text-red-700">{dateFilterError}</p>}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] text-left text-sm">
               <caption className="sr-only">Tasks, assignments, status, priority, due dates, and management actions</caption>
@@ -485,7 +540,7 @@ export default function Task({accessToken,role}: TaskProps) {
               <tbody className="divide-y divide-slate-100">
                 {loading ? <tr><td colSpan={7} className="px-6 py-16 text-center text-slate-500"><span role="status">Loading tasks…</span></td></tr> : listError ? <tr><td colSpan={7} className="px-6 py-12 text-center">
                   <p role="alert" className="text-red-700">{listError}</p>
-                  <button type="button" onClick={() => setTaskListRefresh((current) => !current)} className="mt-3 min-h-11 rounded-xl px-4 py-2 font-semibold text-emerald-800 hover:cursor-pointer hover:bg-emerald-50">Try again</button>
+                  <button type="button" onClick={() => setTaskListRefresh((current) => current + 1)} className="mt-3 min-h-11 rounded-xl px-4 py-2 font-semibold text-emerald-800 hover:cursor-pointer hover:bg-emerald-50">Try again</button>
                 </td></tr> : tasks.length > 0 ? tasks.map((task) => (
                 <tr key={task.task_id} className="transition-colors hover:bg-emerald-50/40">
                   <th scope="row" className="px-6 py-5 font-semibold text-slate-900">

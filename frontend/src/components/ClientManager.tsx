@@ -1,3 +1,4 @@
+import { API_URL } from "../api";
 import { Link } from "react-router";
 import axios from "axios";
 import { useEffect, useState } from "react";
@@ -30,7 +31,7 @@ export default function ClientManager({accessToken, socket}:ClientManagerProps) 
   const[email,setEmail] = useState("")
 
   //Client List Rerender
-  const [clientListrefresh, setClientListrefresh] = useState(false);
+  const [clientListrefresh, setClientListrefresh] = useState(0);
 
   //Serach Client
   const [search, setSearch] = useState("");
@@ -39,7 +40,8 @@ export default function ClientManager({accessToken, socket}:ClientManagerProps) 
 
   //perform Serach
   const searchText = search.trim().toLowerCase();
-  const filteredClients = clients.filter((client) => {
+  console.log(clients);
+  const filteredClients: ClientRowList[] = clients.filter((client) => {
     const matchesSearch = client.name.toLowerCase().includes(searchText) ||
       (client.email ?? "").toLowerCase().includes(searchText);
     const matchesProjects = projectFilter === "all" ||
@@ -49,7 +51,7 @@ export default function ClientManager({accessToken, socket}:ClientManagerProps) 
     return matchesSearch && matchesProjects;
   });
 
-  const URL = "http://localhost:3000"
+  const URL = API_URL;
 
   //fetch all the clients
   useEffect(()=>{
@@ -60,6 +62,7 @@ export default function ClientManager({accessToken, socket}:ClientManagerProps) 
           Authorization: `Bearer ${accessToken}`,
         },
       });
+      console
       setClients(res.data.clients)
       }
       catch(err){
@@ -79,7 +82,7 @@ export default function ClientManager({accessToken, socket}:ClientManagerProps) 
     }
     (async()=>{
       try{
-      const res = await axios.post<{ clients: ClientRowList[] }>(`${URL}/client`, {
+      await axios.post<{ clients: ClientRowList[] }>(`${URL}/client`, {
         name: clientname,
         email: email,
       },
@@ -92,7 +95,6 @@ export default function ClientManager({accessToken, socket}:ClientManagerProps) 
     setClientName("")
     setEmail("")
     setShowAddComponentUI(false)
-    setClients(res.data.clients)
 
     }catch(err){
       console.error("Failed to create clients:", err);
@@ -109,7 +111,7 @@ async function handleDelete(id: string) {
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    setClientListrefresh((current) => !current);
+    setClientListrefresh((current) => current+1);
   } catch (err) {
     console.error("Failed to delete client:", err);
   }
@@ -142,7 +144,7 @@ async function saveEditClient(){
     setshowEditComponentUI(false)
     setClientName("")
     setEmail("")
-    setClientListrefresh((current) => !current)//refersh
+    setClientListrefresh((current) => current+1)//refersh
   }
   catch(err){
     SetError("Failed to Edit client")
@@ -158,20 +160,20 @@ function clearFeild(){
 //Live Feeds
 
 useEffect(() => {
-    if (!socket) return;
+    if (!socket || !accessToken) return;
 
-    const handleClientListRender = ({ clients }: { clients: ClientRowList[] }) => {
-      setClients(clients);
+    const refershClientList = async () => {
+      setClientListrefresh(current => current+1);
     };
 
-    socket.on("client:created", handleClientListRender);
-    socket.on("client:updated",handleClientListRender);
-    socket.on("client:deleted",handleClientListRender)
+    socket.on("client:created", refershClientList );
+    socket.on("client:updated",refershClientList );
+    socket.on("client:deleted",refershClientList )
 
     return () => {
-      socket.off("client:created", handleClientListRender);
-      socket.off("client:updated",handleClientListRender);
-      socket.off("client:deleted",handleClientListRender)
+      socket.off("client:created", refershClientList );
+      socket.off("client:updated",refershClientList );
+      socket.off("client:deleted",refershClientList);
     };
 
   }, [socket]);

@@ -1,6 +1,5 @@
 import { QueryResult } from "pg";
 import {pool} from "../db/pool.ts"
-import { deleteProject } from "./project.controller.ts";
 
 export async function fetchProjectCount(): Promise<number>{
         const res: QueryResult<any> = await pool.query(`SELECT COUNT(*)::int FROM projects;`)
@@ -23,6 +22,25 @@ export async function getAuthorizedRole(userId: string, allowedRoles: string[]):
     [userId, allowedRoles]
   );
   return result.rows[0]?.role ?? null;
+}
+
+type AuthorizedUser = {
+  userId: string;
+  userName: string;
+  role: string;
+};
+
+export async function getAuthorizedUser(userId: string): Promise<AuthorizedUser | null> {
+  const result = await pool.query<AuthorizedUser>(
+    `SELECT u.user_id::text AS "userId", u.user_name AS "userName", r.role_name AS role
+     FROM users u
+     JOIN roles r ON u.role_id = r.role_id
+     WHERE u.user_id = $1
+       AND u.is_active = true
+     LIMIT 1;`,
+    [userId]
+  );
+  return result.rows[0] ?? null;
 }
 
 export type Project = {
@@ -82,7 +100,7 @@ export async function fetchMyProjects(userId: string): Promise<Project[]> {
     JOIN clients c ON p.client_id = c.client_id
     JOIN users creator ON p.created_by = creator.user_id
     LEFT JOIN users manager ON p.project_manager_id = manager.user_id
-    WHERE p.project_manager_id = $1 OR p.created_by = $1;
+    WHERE p.created_by = $1;
   `, [userId]);
   return res.rows;
 }
@@ -109,7 +127,7 @@ export async function fetchProjectManager(id: string): Promise<string | null> {
   return res.rows[0]?.project_manager_id ?? null;
 }
 
-export async function insertProject(actorID:string, title: string, description: string | null, clientId: string, createdBy: string, managerId: string | null): Promise<ProjectRow> {
+export async function insertProject(actorID:string,actorName:string, title: string, description: string | null, clientId: string, createdBy: string, managerId: string | null): Promise<ProjectRow> {
   const db = await pool.connect();
   try{
     await db.query("BEGIN")
@@ -129,17 +147,16 @@ export async function insertProject(actorID:string, title: string, description: 
       [project.project_id, actorID, `Project${project.title} was created`]
     );
   //creat the Notification
-  const adminMessage:string = `Project ${project.title} was created by ${actorID}`; 
-  const projectManagerMessage:string = `you are assigned to the Poject ${project.title} by ${actorID}`;
+  const adminMessage:string = `Project ${project.title} was created by ${actorName}`; 
   await db.query(
   `INSERT INTO notifications (recipient_user_id, activity_id, message)
-   SELECT u.user_id, $1,CASE WHEN u.user_id = $5 THEN $3 ELSE $2 END
+   SELECT u.user_id, $1, $2
    FROM users u
    JOIN roles r ON r.role_id = u.role_id
-   WHERE (r.role_name = 'ADMIN' OR u.user_id = $5)
+   WHERE (r.role_name = 'ADMIN' OR u.user_id = $3)
      AND u.is_active = true
      AND u.user_id <> $4`,
-  [activity.rows[0].id, adminMessage, projectManagerMessage, actorID, managerId]
+  [activity.rows[0].id, adminMessage, createdBy, actorID]
 );
   await db.query("COMMIT");
   return project
@@ -158,6 +175,7 @@ export type UpdateProjectResult = {
 };
 export async function updateProject(
   actorID: string,
+  actorName:string,
   project_id: string,
   title: string,
   description: string | null,
@@ -188,7 +206,7 @@ export async function updateProject(
          WHERE u.user_id = $6
            AND (
            r.role_name = 'ADMIN' 
-           OR (r.role_name = 'PROJECT_MANAGER' AND p.project_manager_id = $6)
+           OR (r.role_name = 'PROJECT_MANAGER' AND p.created_by = $6)
            )
            AND u.is_active = true
        )
@@ -209,43 +227,15 @@ export async function updateProject(
       [project.project_id, actorID, `Project ${project.title} was updated`],
     );
 
-    const managerChanged = project.project_manager_id !== previousProjectManagerID;
-    const adminMessage: string = `Project ${project.title} was updated by ${actorID}`;
-    const projectManagerMessage: string = `You were assigned to project ${project.title} by ${actorID}`;
+    const message = `Project ${project.title} was updated by ${actorName}`;
     await db.query(
       `INSERT INTO notifications (recipient_user_id, activity_id, message)
-   SELECT u.user_id, $1,CASE WHEN u.user_id = $5 THEN $3 ELSE $2 END
-   FROM users u
-   JOIN roles r ON r.role_id = u.role_id
-   WHERE (r.role_name = 'ADMIN' OR (u.user_id = $5 AND $6))
-     AND u.is_active = true
-     AND u.user_id <> $4`,
-      [
-        activity.rows[0].id,
-        adminMessage,
-        projectManagerMessage,
-        actorID,
-        managerId,
-        managerChanged,
-      ],
+       SELECT u.user_id, $1, $2 FROM users u
+       JOIN roles r ON r.role_id = u.role_id
+       WHERE u.is_active = true AND u.user_id <> $3
+         AND (r.role_name = 'ADMIN' OR u.user_id = $4);`,
+      [activity.rows[0].id, message, actorID, project.created_by]
     );
-    if (
-      previousProjectManagerID &&
-      managerChanged &&
-      previousProjectManagerID !== actorID
-    ) {
-      //create Notification for the Old Mnanger
-      await db.query(
-        `INSERT INTO notifications (recipient_user_id, activity_id, message)
-      VALUES ($1,$2,$3);
-      `,
-        [
-          previousProjectManagerID,
-          activity.rows[0].id,
-          `You are no longer the manager of project ${project.title}`,
-        ],
-      );
-    }
     await db.query("COMMIT");
 
     return {
@@ -264,7 +254,7 @@ export async function updateProject(
 export type deletedResponse = {
   project:ProjectRow
 }
-export async function removeProject(id: string, actorID: string): Promise<deletedResponse | null> {
+export async function removeProject(id: string, actorID: string,actorName:string): Promise<deletedResponse | null> {
 
   const db = await pool.connect();
   try{
@@ -280,7 +270,7 @@ WHERE p.project_id = $1
       AND (
         r.role_name = 'ADMIN'
         OR (r.role_name = 'PROJECT_MANAGER'
-            AND p.project_manager_id = $2)
+            AND p.created_by = $2)
       )
   )
 RETURNING p.project_id, p.title, p.description, p.client_id, p.created_by, p.project_manager_id, p.created_at;`,
@@ -296,14 +286,14 @@ RETURNING p.project_id, p.title, p.description, p.client_id, p.created_by, p.pro
   //insert the Activity
     const activity = await db.query<{ id: string }>(
   `INSERT INTO activity_logs
-     (project_id, actor_id, action, description)
-   VALUES (NULL, $1, 'PROJECT_DELETED', $2)
+     (project_id, actor_id, action, description, project_owner_id)
+   VALUES (NULL, $1, 'PROJECT_DELETED', $2, $3)
    RETURNING activity_id::text AS id`,
-  [actorID, `Project ${DeletedProject.title} (ID ${DeletedProject.project_id}) was deleted`],
+  [actorID, `Project ${DeletedProject.title} (ID ${DeletedProject.project_id}) was deleted`, DeletedProject.created_by],
 );
 
   //creat the Notification
-  const message = `Project ${DeletedProject.title} was deleted by ${actorID}`;
+  const message = `Project ${DeletedProject.title} was deleted by ${actorName}`;
 
 await db.query(
   `INSERT INTO notifications (recipient_user_id, activity_id, message)
@@ -313,7 +303,7 @@ await db.query(
    WHERE (r.role_name = 'ADMIN' OR u.user_id = $4)
      AND u.is_active = true
      AND u.user_id <> $3`,
-  [activity.rows[0].id, message, actorID, DeletedProject.project_manager_id]
+  [activity.rows[0].id, message, actorID, DeletedProject.created_by]
 );
   await db.query("COMMIT")
   return {
@@ -333,7 +323,7 @@ export async function fetchManagedProjectCount(userId: string): Promise<number> 
   const res: QueryResult<any> = await pool.query(`
                                SELECT COUNT(*):: int AS count
                                FROM projects
-                               WHERE project_manager_id = $1 OR created_by = $1;
+                               WHERE created_by = $1;
                              `, [userId]);
   return res.rows[0].count;
 }

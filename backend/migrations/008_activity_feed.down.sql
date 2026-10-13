@@ -1,0 +1,11 @@
+BEGIN;
+DROP INDEX projects_created_by_idx;
+DROP INDEX activity_logs_created_idx;
+DROP TABLE activity_feed_seen;
+DROP TRIGGER task_scope_before_delete ON tasks;
+DROP FUNCTION preserve_deleted_task_scope();
+DROP TRIGGER activity_scope_before_insert ON activity_logs;
+DROP FUNCTION capture_activity_scope();
+ALTER TABLE activity_logs DROP COLUMN task_assignee_id;
+ALTER TABLE activity_logs DROP COLUMN project_owner_id;
+COMMIT;

@@ -1,3 +1,5 @@
+import { API_URL } from "../api";
+import ActivityFeed from "../components/ActivityFeed";
 import axios from "axios";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
@@ -27,7 +29,14 @@ type AdminDashboardProps = {
   onlineUsers: number | null;
 };
 
-const URL = 'http://localhost:3000';
+type TaskCounts = {
+    todo: number;
+    inprocess: number;
+    in_review: number;
+    done: number;
+}
+
+const URL = API_URL;
 
 const statuses: {
   key: TaskStatus;
@@ -136,25 +145,113 @@ function AdminDashboard({
 
   //Live Feeds
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !accessToken) return;
 
-    const handleClientCount = ({ clientCount }: { clientCount: number }) => {
-      setTotalClients(clientCount);
+    const refreshClientCount = async () => {
+      try {
+        const { data } = await axios.get<{ totalClients: number }>(
+          `${URL}/client/clientcount`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        setTotalClients(data.totalClients);
+      } catch (error) {
+        console.error("Could not refresh client count:", error);
+      }
     };
 
-    const handleProjectCount = ({totalProject}:{totalProject:number})=>{
-      setTotalProjects(totalProject)
+    const handleProjectCount = async() => {
+      try {
+        const res = await axios.get<{ totalProject: number }>(
+          `${URL}/project/projectcount`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        setTotalProjects(res.data.totalProject);
+      } catch (error) {
+        console.error("Could not refresh Project count:", error);
+      }
     }
 
-    socket.on("client:count",handleClientCount);
-    socket.on("project:count",handleProjectCount);
+    let taskController: AbortController | null = null;
 
-    return () => {
-      socket.off("client:count",handleClientCount);
-      socket.off("project:count",handleProjectCount);
+    const handleTaskCount = async(signal: AbortSignal) => {
+      try{
+        const {data} = await axios.get<{ totalTask: number }>(
+          `${URL}/task/taskcount`,
+          { headers: { Authorization: `Bearer ${accessToken}` }, signal },
+        );
+        if (signal.aborted) return;
+        setTotalTasks(data.totalTask);
+      }catch(error){
+        if (signal.aborted) return;
+        console.error("Could not refresh Task count:", error);
+      }
+    }
+
+    const handleTaskByStatusCount = async(signal: AbortSignal) => {
+      try{
+        const { data } = await axios.get<{ taskCountByStats: TaskCounts }>(
+          `${URL}/task/countbystatus`,
+          { headers: { Authorization: `Bearer ${accessToken}` }, signal },
+        );
+        if (signal.aborted) return;
+        setTasksByStatus({
+          TO_DO: data.taskCountByStats.todo,
+          IN_PROGRESS: data.taskCountByStats.inprocess,
+          IN_REVIEW: data.taskCountByStats.in_review,
+          DONE: data.taskCountByStats.done,
+        });
+      }catch(error){
+        if (signal.aborted) return;
+        console.error("Could not refresh TaskByStatus count:", error);
+      }
+    }
+
+    const handleOverdueTaskCount = async(signal: AbortSignal) => {
+      try {
+        const { data } = await axios.get<{ totalOverDueTask: number }>(
+          `${URL}/task/overduecount`,
+          { headers: { Authorization: `Bearer ${accessToken}` }, signal },
+        );
+        if (signal.aborted) return;
+        setOverdueTasks(data.totalOverDueTask);
+      } catch (error) {
+        if (signal.aborted) return;
+        console.error("Could not refresh overdue task count:", error);
+      }
     };
 
-  }, [socket]);
+    const refreshTaskCounts = () => {
+      taskController?.abort();
+      taskController = new AbortController();
+      void handleTaskCount(taskController.signal);
+      void handleTaskByStatusCount(taskController.signal);
+      void handleOverdueTaskCount(taskController.signal);
+    };
+
+    socket.on("client:created",refreshClientCount);
+    socket.on("client:deleted",refreshClientCount);
+
+    socket.on("project:created",handleProjectCount);
+    socket.on("project:deleted",handleProjectCount);
+
+    socket.on("task:created",refreshTaskCounts);
+    socket.on("task:deleted",refreshTaskCounts);
+    socket.on("task:updated",refreshTaskCounts);
+
+    return () => {
+      socket.off("client:created",refreshClientCount);
+      socket.off("client:deleted",refreshClientCount);
+    
+      socket.off("project:created",handleProjectCount);
+      socket.off("project:deleted",handleProjectCount);
+
+      socket.off("task:created",refreshTaskCounts);
+      socket.off("task:deleted",refreshTaskCounts);
+      socket.off("task:updated",refreshTaskCounts);
+      taskController?.abort();
+    };
+
+  }, [socket,accessToken]);
 
   function retrySummary() {
     setLoading(true);
@@ -417,6 +514,7 @@ function AdminDashboard({
             </div>
           </div>
         </section>
+        <ActivityFeed accessToken={accessToken} socket={socket} role="ADMIN" />
       </div>
     </section>
   );
