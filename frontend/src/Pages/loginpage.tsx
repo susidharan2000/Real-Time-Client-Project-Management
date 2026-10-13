@@ -57,20 +57,21 @@ function LoginPage({ initialSession }: LoginPageProps) {
 
   async function handleLogout() {
   try {
-    const res = await axios.post(
+    await axios.post(
       `${URL}/auth/logout`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, timeout: 10000 }
     );
-
-    if (res.status === 200) {
-      setUsername("");
-      setUserId("");
-      setAccessToken("");
-      navigate('/', { replace: true });
-    }
   } catch (err) {
     console.error("Logout failed:", err);
+  } finally {
+    setUsername("");
+    setUserId("");
+    setAccessToken(null);
+    setRole("");
+    setPassword("");
+    setError("");
+    navigate('/', { replace: true });
   }
  }
 
