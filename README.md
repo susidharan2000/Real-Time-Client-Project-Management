@@ -22,23 +22,51 @@ Task filters for status, priority, and due-date range live in the browser URL an
 
 > **Current scope:** the included seed creates the seven required accounts and their roles. It does not yet create the required three projects, fifteen or more tasks, two overdue tasks, or historical activity. User-management screens/routes and individual/true mark-all notification controls are also outstanding. See [Known limitations](#known-limitations).
 
-## Architecture
+## Task update sequence
 
 ```mermaid
-flowchart TD
-    B["Browser: React + TypeScript"]
-    H["Express HTTP API"]
-    W["Socket.IO: WebSocket only"]
-    S["Services: permissions and transactions"]
-    D["PostgreSQL"]
-    J["node-cron: overdue checks"]
-    B -->|Requests and filtered reads| H
-    H --> S
-    S --> D
-    H -->|After successful writes| W
-    W -->|Targeted events and presence| B
-    J --> S
-    J -->|After overdue transaction| W
+sequenceDiagram
+    autonumber
+    actor Developer
+    participant UI as Developer UI
+    participant API as Express API
+    participant Service as Task service
+    participant DB as PostgreSQL
+    participant Socket as Socket.IO
+    participant Clients as Authorized connected clients
+
+    Note over UI,Clients: Authenticated sockets have already joined server-controlled rooms
+    Developer->>UI: Click Start task
+    UI->>API: PATCH /task/:id/start with Bearer token
+    API->>DB: Check active user and role after JWT verification
+    DB-->>API: Authorization result
+    alt Invalid token or disallowed role
+        API-->>UI: 401 or 403
+    else Authorized developer
+        API->>Service: Start assigned task
+        Service->>DB: BEGIN and lock assigned task FOR UPDATE
+        DB-->>Service: Task and current status
+        alt Task unavailable or status is not TO_DO
+            Service->>DB: ROLLBACK
+            Service-->>API: Not found or status conflict
+            API-->>UI: 404 or 409
+        else Valid transition
+            Service->>DB: Update status to IN_PROGRESS
+            Service->>DB: Insert activity with old and new values
+            Service->>DB: Insert notifications for eligible recipients
+            Service->>DB: COMMIT
+            DB-->>Service: Transaction committed
+            Service-->>API: Updated task and recipient information
+            API->>Socket: Emit task and notification invalidation events
+            Socket-->>Clients: Events to relevant rooms
+            API-->>UI: 200 with updated task
+            Clients->>API: Refetch affected data with Bearer token
+            API->>DB: Read data within each user's authorized scope
+            DB-->>API: Current tasks, counts, activity, or notifications
+            API-->>Clients: Updated data
+            Note over UI,Clients: React updates state and renders without a page reload
+        end
+    end
 ```
 
 Express and Socket.IO share one HTTP server and one Node.js process. PostgreSQL is the source of truth for tasks, activity, notifications, and refresh-token sessions. Presence is held in process memory.
