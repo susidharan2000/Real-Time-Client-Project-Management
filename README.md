@@ -111,7 +111,24 @@ Each run processes up to 100 due, unfinished tasks using `FOR UPDATE SKIP LOCKED
 
 ## Database schema and indexes
 
-The schema is defined by [versioned SQL migrations](backend/migrations).
+![Database design showing roles, users, refresh tokens, clients, projects, tasks, activity logs, and per-user notifications](docs/images/database-design.png)
+
+[Open the full-size database diagram](docs/images/database-design.png).
+
+This diagram captures the original relational design. The [versioned SQL migrations](backend/migrations) define the implemented schema: some names differ, refresh tokens have a separate token hash, and later migrations add overdue tracking, activity scope snapshots, and `activity_feed_seen`.
+
+### Why this design
+
+- **Separate roles from users.** Each user references a role, so role definitions are shared rather than duplicated across accounts. The current middleware checks role names and the user's active flag; the `permissions` JSONB column is available for future finer-grained rules.
+- **Model clients → projects → tasks with foreign keys.** A client can have many projects, and a project can have many tasks. Keeping these entities separate avoids copying client and project details into every task. Foreign keys enforce valid relationships.
+- **Keep creation and assignment separate.** `created_by` identifies who created a record; `project_manager_id` and `assigned_to` identify responsibility. These are different facts: an admin can create work for another user. Authorization queries must explicitly apply the intended ownership or assignment rule; a foreign key alone does not grant access.
+- **Store refresh sessions separately.** A user can have multiple sessions with their own expiry and revocation state. The implemented table stores a hash of the refresh token, allowing a session to be revoked without storing its raw token.
+- **Record one activity with structured changes.** `activity_logs` records who acted, what entity changed, and what happened. A `changes` JSONB object can hold old/new values for status, priority, assignee, or due date in one update. Adding a tracked field does not require another pair of database columns. Services still need to validate and construct those changes consistently.
+- **Create one notification per recipient.** One activity can notify multiple admins, a PM, and a developer. Separate notification rows let each recipient read their own notification independently while sharing the same activity reference. This also supports recipient-specific messages and indexed unread queries.
+- **Preserve history when business records are deleted.** Nullable activity references use `ON DELETE SET NULL`. The description and changes remain after deletion, while later scope snapshots retain the ownership/assignment information needed for authorized history. Activity seen state is stored separately from notification read state.
+- **Commit data, activity, and notifications together.** Mutation services use a database transaction so related writes succeed or roll back together. Socket events are emitted after commit, prompting clients to fetch the committed data. Live delivery remains best effort; durable history stays in PostgreSQL.
+
+### Implemented tables
 
 | Table | Responsibility and main relationships |
 | --- | --- |
