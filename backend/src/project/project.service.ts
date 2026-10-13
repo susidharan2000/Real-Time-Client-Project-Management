@@ -323,7 +323,7 @@ export async function fetchManagedProjectCount(userId: string): Promise<number> 
   const res: QueryResult<any> = await pool.query(`
                                SELECT COUNT(*):: int AS count
                                FROM projects
-                               WHERE created_by = $1;
+                               WHERE created_by = $1 OR project_manager_id = $1;
                              `, [userId]);
   return res.rows[0].count;
 }
