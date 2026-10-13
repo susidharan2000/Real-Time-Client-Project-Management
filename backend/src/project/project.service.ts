@@ -100,7 +100,7 @@ export async function fetchMyProjects(userId: string): Promise<Project[]> {
     JOIN clients c ON p.client_id = c.client_id
     JOIN users creator ON p.created_by = creator.user_id
     LEFT JOIN users manager ON p.project_manager_id = manager.user_id
-    WHERE p.created_by = $1;
+    WHERE p.created_by = $1 OR  p.project_manager_id = $1;
   `, [userId]);
   return res.rows;
 }
