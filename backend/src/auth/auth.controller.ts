@@ -1,10 +1,13 @@
 import type { CookieOptions, Request, Response} from "express";
 import { authenticateUser,verifyRefreshToken,RevokeRefreshToken,verifySession } from "./auth.service.ts";
 
+const secureCookie = process.env.NODE_ENV === "production" || process.env.FRONTEND_ORIGIN?.startsWith("https://") === true;
+
 const refreshCookieOptions: CookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || process.env.FRONTEND_ORIGIN?.startsWith("https://") === true,
-    sameSite: "strict",
+    secure: secureCookie,
+    sameSite: secureCookie ? "none" : "strict",
+    path: "/",
 };
 
 export const login = async (req: Request, res: Response) => {
