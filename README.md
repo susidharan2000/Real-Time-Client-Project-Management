@@ -230,15 +230,17 @@ The frontend defaults to `http://localhost:3000`. Set `VITE_API_URL` in `fronten
 
 Run [backend/src/db/seed.ts](backend/src/db/seed.ts) after applying migrations. All created accounts use the configured `SEED_DEMO_PASSWORD`.
 
-| Role | Usernames |
-| --- | --- |
-| Admin | `admin` |
-| Project Manager | `pm1`, `pm2` |
-| Developer | `dev1`, `dev2`, `dev3`, `dev4` |
+Demo login credentials:
+
+| Role | Usernames | Password |
+| --- | --- | --- |
+| Admin | `admin` | `password123` |
+| Project Manager | `pm1`, `pm2` | `password123` |
+| Developer | `dev1`, `dev2`, `dev3`, `dev4` | `password123` |
 
 The seed is transactional and skips existing accounts; it does not reset existing passwords. In the current version, create clients/projects/tasks through the UI after seeding. A complete assessment fixture is still required to make the feed populated on first load.
 
-The local seed password is not automatically the deployed demo password. Provide reviewer credentials separately for the deployed environment.
+To use the same credentials locally, set `SEED_DEMO_PASSWORD=password123` before seeding.
 
 ## API reference
 
